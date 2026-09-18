@@ -1,0 +1,290 @@
+import { FileItem, FolderItem } from '../types';
+
+export const initialFolders: FolderItem[] = [
+  // Internal Storage Folders
+  { id: 'f-root', name: 'Internal Storage', path: '/', parentPath: '', storageDevice: 'internal', createdAt: '2026-01-01' },
+  { id: 'f-dcim', name: 'DCIM', path: '/DCIM', parentPath: '/', storageDevice: 'internal', createdAt: '2026-01-02' },
+  { id: 'f-camera', name: 'Camera', path: '/DCIM/Camera', parentPath: '/DCIM', storageDevice: 'internal', createdAt: '2026-01-02' },
+  { id: 'f-download', name: 'Download', path: '/Download', parentPath: '/', storageDevice: 'internal', createdAt: '2026-01-02' },
+  { id: 'f-documents', name: 'Documents', path: '/Documents', parentPath: '/', storageDevice: 'internal', createdAt: '2026-01-05' },
+  { id: 'f-music', name: 'Music', path: '/Music', parentPath: '/', storageDevice: 'internal', createdAt: '2026-01-08' },
+  { id: 'f-movies', name: 'Movies', path: '/Movies', parentPath: '/', storageDevice: 'internal', createdAt: '2026-01-10' },
+  { id: 'f-pictures', name: 'Pictures', path: '/Pictures', parentPath: '/', storageDevice: 'internal', createdAt: '2026-01-15' },
+  { id: 'f-screenshots', name: 'Screenshots', path: '/Pictures/Screenshots', parentPath: '/Pictures', storageDevice: 'internal', createdAt: '2026-01-16' },
+  { id: 'f-android', name: 'Android', path: '/Android', parentPath: '/', storageDevice: 'internal', createdAt: '2026-01-01' },
+
+  // SD Card Folders
+  { id: 'f-sd-root', name: 'SD Card', path: '/', parentPath: '', storageDevice: 'sdcard', createdAt: '2026-01-01' },
+  { id: 'f-sd-dcim', name: 'DCIM', path: '/DCIM', parentPath: '/', storageDevice: 'sdcard', createdAt: '2026-01-03' },
+  { id: 'f-sd-movies', name: 'Movies', path: '/Movies', parentPath: '/', storageDevice: 'sdcard', createdAt: '2026-01-04' },
+  { id: 'f-sd-backup', name: 'Backups', path: '/Backups', parentPath: '/', storageDevice: 'sdcard', createdAt: '2026-01-05' },
+  { id: 'f-sd-photos', name: 'Family_Photos', path: '/DCIM/Family_Photos', parentPath: '/DCIM', storageDevice: 'sdcard', createdAt: '2026-01-06' },
+];
+
+export const initialFiles: FileItem[] = [
+  // Images
+  {
+    id: 'img-1',
+    name: 'IMG_20260815_Sunrise_Himalayas.jpg',
+    size: 4820000, // 4.8 MB
+    type: 'image',
+    mimeType: 'image/jpeg',
+    folder: '/DCIM/Camera',
+    createdAt: '2026-08-15T06:12:00Z',
+    updatedAt: '2026-08-15T06:12:00Z',
+    url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=300&auto=format&fit=crop&q=60',
+    isStarred: true,
+  },
+  {
+    id: 'img-2',
+    name: 'DSC_0942_TajMahal_Agra.jpg',
+    size: 3450000, // 3.4 MB
+    type: 'image',
+    mimeType: 'image/jpeg',
+    folder: '/DCIM/Camera',
+    createdAt: '2026-08-10T14:30:00Z',
+    updatedAt: '2026-08-10T14:30:00Z',
+    url: 'https://images.unsplash.com/photo-1564507592333-c60657eea523?w=1200&auto=format&fit=crop&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1564507592333-c60657eea523?w=300&auto=format&fit=crop&q=60',
+    isDuplicate: true,
+    duplicateGroup: 'dup-taj-mahal',
+  },
+  {
+    id: 'img-2-copy',
+    name: 'DSC_0942_TajMahal_Agra (1).jpg',
+    size: 3450000,
+    type: 'image',
+    mimeType: 'image/jpeg',
+    folder: '/Download',
+    createdAt: '2026-08-20T09:15:00Z',
+    updatedAt: '2026-08-20T09:15:00Z',
+    url: 'https://images.unsplash.com/photo-1564507592333-c60657eea523?w=1200&auto=format&fit=crop&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1564507592333-c60657eea523?w=300&auto=format&fit=crop&q=60',
+    isDuplicate: true,
+    duplicateGroup: 'dup-taj-mahal',
+  },
+  {
+    id: 'img-3',
+    name: 'Screenshot_20260901_Payment_Receipt.png',
+    size: 920000, // 920 KB
+    type: 'image',
+    mimeType: 'image/png',
+    folder: '/Pictures/Screenshots',
+    createdAt: '2026-09-01T18:45:00Z',
+    updatedAt: '2026-09-01T18:45:00Z',
+    url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=1200&auto=format&fit=crop&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=300&auto=format&fit=crop&q=60',
+  },
+  {
+    id: 'img-4',
+    name: 'Portrait_Sunset_Beach.jpg',
+    size: 5120000,
+    type: 'image',
+    mimeType: 'image/jpeg',
+    folder: '/DCIM/Camera',
+    createdAt: '2026-08-29T19:10:00Z',
+    updatedAt: '2026-08-29T19:10:00Z',
+    url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&auto=format&fit=crop&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=300&auto=format&fit=crop&q=60',
+    isStarred: true,
+  },
+
+  // Videos (playable)
+  {
+    id: 'vid-1',
+    name: '4K_Drone_Kerala_Backwaters.mp4',
+    size: 78500000, // 78.5 MB - Large file
+    type: 'video',
+    mimeType: 'video/mp4',
+    folder: '/Movies',
+    createdAt: '2026-08-22T11:20:00Z',
+    updatedAt: '2026-08-22T11:20:00Z',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    thumbnail: 'https://images.unsplash.com/photo-1593693397690-362cb9666fc2?w=300&auto=format&fit=crop&q=60',
+    isLarge: true,
+    isStarred: true,
+  },
+  {
+    id: 'vid-2',
+    name: 'ScreenRecord_Tutorial_Setup.mp4',
+    size: 24200000, // 24.2 MB - Large file
+    type: 'video',
+    mimeType: 'video/mp4',
+    folder: '/Movies',
+    createdAt: '2026-08-28T16:05:00Z',
+    updatedAt: '2026-08-28T16:05:00Z',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4',
+    thumbnail: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=300&auto=format&fit=crop&q=60',
+    isLarge: true,
+  },
+
+  // Audio (playable)
+  {
+    id: 'aud-1',
+    name: 'Relaxing_Acoustic_Guitar.mp3',
+    size: 4200000, // 4.2 MB
+    type: 'audio',
+    mimeType: 'audio/mpeg',
+    folder: '/Music',
+    createdAt: '2026-07-14T10:00:00Z',
+    updatedAt: '2026-07-14T10:00:00Z',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    isStarred: true,
+  },
+  {
+    id: 'aud-2',
+    name: 'Voice_Memo_Meeting_Notes.m4a',
+    size: 1850000, // 1.85 MB
+    type: 'audio',
+    mimeType: 'audio/mp4',
+    folder: '/Music',
+    createdAt: '2026-08-30T13:40:00Z',
+    updatedAt: '2026-08-30T13:40:00Z',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+  },
+
+  // Documents
+  {
+    id: 'doc-1',
+    name: 'Resume_Software_Engineer_2026.pdf',
+    size: 1450000, // 1.45 MB
+    type: 'document',
+    mimeType: 'application/pdf',
+    folder: '/Documents',
+    createdAt: '2026-09-02T15:20:00Z',
+    updatedAt: '2026-09-02T15:20:00Z',
+    content: `# Curriculum Vitae\n\n**Candidate:** Full-Stack & Mobile Developer\n**Location:** New Delhi, India\n\n### Summary\nExperienced developer specializing in React, TypeScript, Android and Cloud architectures.\n\n### Skills\n- Frontend: React 19, TypeScript, Tailwind CSS, Material 3\n- Mobile: Android, Files by Google Architecture, Offline Sync\n- Backend: Node.js, Express, SQLite, Cloud APIs\n\n### Projects\n- **Google Files App**: High fidelity file manager with storage cleaner, nearby sharing, category filters, and safe vault.`,
+    isStarred: true,
+  },
+  {
+    id: 'doc-2',
+    name: 'Project_Financial_Plan_Q3.xlsx',
+    size: 850000,
+    type: 'document',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    folder: '/Documents',
+    createdAt: '2026-08-25T11:00:00Z',
+    updatedAt: '2026-08-25T11:00:00Z',
+    content: `Item | Q1 | Q2 | Q3 (Est.)\n-------------------------\nServer Hosting | $420 | $510 | $490\nDomain & SSL   | $80  | $0   | $0\nMarketing Ads  | $1200| $1500| $1350\nNet Savings    | $4800| $5400| $6100`,
+  },
+  {
+    id: 'doc-3',
+    name: 'Meeting_Notes_Google_Files_Feature.txt',
+    size: 45000,
+    type: 'document',
+    mimeType: 'text/plain',
+    folder: '/Download',
+    createdAt: '2026-09-03T17:00:00Z',
+    updatedAt: '2026-09-03T17:00:00Z',
+    content: `Google File Manager Features Checklist:\n1. Clean tab with Junk cache removal\n2. Duplicate file detector\n3. Category view (Downloads, Images, Videos, Audio, Documents, Apps)\n4. Starred collections\n5. Safe Folder protected with 4-digit PIN\n6. Internal Storage folder browser\n7. Multi-select and batch actions\n8. Nearby Share simulator`,
+  },
+  {
+    id: 'doc-3-copy',
+    name: 'Meeting_Notes_Google_Files_Feature (Copy).txt',
+    size: 45000,
+    type: 'document',
+    mimeType: 'text/plain',
+    folder: '/Documents',
+    createdAt: '2026-09-03T17:05:00Z',
+    updatedAt: '2026-09-03T17:05:00Z',
+    content: `Google File Manager Features Checklist:\n1. Clean tab with Junk cache removal\n2. Duplicate file detector\n3. Category view (Downloads, Images, Videos, Audio, Documents, Apps)\n4. Starred collections\n5. Safe Folder protected with 4-digit PIN\n6. Internal Storage folder browser\n7. Multi-select and batch actions\n8. Nearby Share simulator`,
+    isDuplicate: true,
+    duplicateGroup: 'dup-notes',
+  },
+
+  // Apps & APKs
+  {
+    id: 'apk-1',
+    name: 'WhatsApp_Messenger_v2.26.12.apk',
+    size: 45800000, // 45.8 MB
+    type: 'apk',
+    mimeType: 'application/vnd.android.package-archive',
+    folder: '/Download',
+    createdAt: '2026-08-18T09:30:00Z',
+    updatedAt: '2026-08-18T09:30:00Z',
+    isLarge: true,
+  },
+  {
+    id: 'apk-2',
+    name: 'Snapseed_Photo_Editor_Pro.apk',
+    size: 28400000, // 28.4 MB
+    type: 'apk',
+    mimeType: 'application/vnd.android.package-archive',
+    folder: '/Download',
+    createdAt: '2026-08-05T14:15:00Z',
+    updatedAt: '2026-08-05T14:15:00Z',
+    isLarge: true,
+  },
+
+  // Safe Folder Item (encrypted/locked)
+  {
+    id: 'safe-1',
+    name: 'Personal_Passport_Copy_Confidential.jpg',
+    size: 2300000,
+    type: 'image',
+    mimeType: 'image/jpeg',
+    folder: '/Documents',
+    createdAt: '2026-07-20T10:00:00Z',
+    updatedAt: '2026-07-20T10:00:00Z',
+    url: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=1200&auto=format&fit=crop&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=300&auto=format&fit=crop&q=60',
+    isSafe: true,
+  },
+
+  // Trash Item (recently deleted)
+  {
+    id: 'trash-1',
+    name: 'Old_Unused_Draft_Presentation.pdf',
+    size: 3200000,
+    type: 'document',
+    mimeType: 'application/pdf',
+    folder: '/Documents',
+    createdAt: '2026-08-01T12:00:00Z',
+    updatedAt: '2026-08-28T08:00:00Z',
+    isTrash: true,
+    trashDate: '2026-08-28T08:00:00Z',
+    content: 'Obsolete pitch deck from last month.',
+  },
+
+  // SD Card Initial Files
+  {
+    id: 'sd-file-1',
+    name: 'Family_Trip_Goa_2026.jpg',
+    size: 6150000,
+    type: 'image',
+    mimeType: 'image/jpeg',
+    folder: '/DCIM/Family_Photos',
+    storageDevice: 'sdcard',
+    createdAt: '2026-08-12T10:00:00Z',
+    updatedAt: '2026-08-12T10:00:00Z',
+    url: 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=1200&auto=format&fit=crop&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=300&auto=format&fit=crop&q=60',
+  },
+  {
+    id: 'sd-file-2',
+    name: 'Documentary_Wildlife_Safari.mp4',
+    size: 145000000, // 145 MB
+    type: 'video',
+    mimeType: 'video/mp4',
+    folder: '/Movies',
+    storageDevice: 'sdcard',
+    createdAt: '2026-08-14T15:20:00Z',
+    updatedAt: '2026-08-14T15:20:00Z',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    thumbnail: 'https://images.unsplash.com/photo-1534567153574-2b12153a87f0?w=300&auto=format&fit=crop&q=60',
+    isLarge: true,
+  },
+  {
+    id: 'sd-file-3',
+    name: 'Full_System_Backup_Archive.zip',
+    size: 89000000, // 89 MB
+    type: 'archive',
+    mimeType: 'application/zip',
+    folder: '/Backups',
+    storageDevice: 'sdcard',
+    createdAt: '2026-08-20T18:00:00Z',
+    updatedAt: '2026-08-20T18:00:00Z',
+    isLarge: true,
+  }
+];

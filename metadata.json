@@ -1,0 +1,7 @@
+{
+  "name": "Files - Google File Manager",
+  "description": "A Google Files-inspired file manager with storage cleaner, category browsing, internal storage & SD card explorer, copy/move with real-time MBPS transfer speed meter and speed controls, file previews, and quick share.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
