@@ -1,9 +1,10 @@
-import { registerPlugin } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Device } from '@capacitor/device';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Share } from '@capacitor/share';
 import { FileItem, FolderItem } from '../types';
+import { classifyFile } from './fileClassifier';
 
 export interface StorageVolumeInfo {
   name: string;
@@ -61,6 +62,18 @@ export interface RealStoragePluginInterface {
   }>;
   deleteFile(options: { path: string }): Promise<{ success: boolean }>;
   openFileWithApp(options: { path: string }): Promise<{ success: boolean }>;
+  createDirectory(options: { path: string }): Promise<{ success: boolean; path?: string }>;
+  copyFile(options: { sourcePath: string; targetFolderPath: string }): Promise<{
+    success: boolean;
+    newPath?: string;
+    name?: string;
+    size?: number;
+  }>;
+  moveFile(options: { sourcePath: string; targetFolderPath: string }): Promise<{
+    success: boolean;
+    newPath?: string;
+    name?: string;
+  }>;
 }
 
 export const RealDeviceStorage = registerPlugin<RealStoragePluginInterface>('RealDeviceStorage');
@@ -77,22 +90,70 @@ export async function triggerHapticFeedback(style: ImpactStyle = ImpactStyle.Lig
 }
 
 /**
- * Native Android Share sheet for files / links
+ * Native Android & Web Share sheet for files / links
  */
-export async function shareNativeFile(title: string, text: string, url?: string) {
+export async function shareNativeFile(
+  title: string, 
+  text: string, 
+  url?: string,
+  files?: string[]
+): Promise<boolean> {
+  await triggerHapticFeedback(ImpactStyle.Medium);
+
+  // 1. Try Capacitor Native Share plugin (Android/iOS)
   try {
-    await triggerHapticFeedback(ImpactStyle.Medium);
-    await Share.share({
-      title,
-      text,
-      url,
-      dialogTitle: 'Share with Google Files',
-    });
-    return true;
+    const isNative = await isNativePlatform();
+    if (isNative) {
+      await Share.share({
+        title,
+        text,
+        url: url && !url.startsWith('blob:') && !url.startsWith('data:') ? url : undefined,
+        files: files && files.length > 0 ? files : (url && url.startsWith('file://') ? [url] : undefined),
+        dialogTitle: 'Google Files - Share',
+      });
+      return true;
+    }
   } catch (err) {
-    console.log('Share dismissed or failed:', err);
-    return false;
+    console.warn('Native Capacitor Share error, falling back:', err);
   }
+
+  // 2. Try Web Share API (Mobile Browsers, Chrome, Safari, PWA)
+  if (typeof navigator !== 'undefined' && navigator.share) {
+    try {
+      const shareData: ShareData = {
+        title,
+        text,
+        url: url && url.startsWith('http') ? url : window.location.href,
+      };
+      await navigator.share(shareData);
+      return true;
+    } catch (webShareErr: unknown) {
+      if ((webShareErr as Error)?.name === 'AbortError') {
+        return true; // User cancelled the share sheet cleanly
+      }
+      console.warn('Web Share API error:', webShareErr);
+    }
+  }
+
+  // 3. Fallback: Copy to clipboard or trigger download
+  try {
+    if (url && (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('http'))) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = title || 'shared-file';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return true;
+    } else if (navigator.clipboard) {
+      await navigator.clipboard.writeText(`${title}\n${text}`);
+      return true;
+    }
+  } catch (fallbackErr) {
+    console.error('All share methods failed:', fallbackErr);
+  }
+
+  return false;
 }
 
 /**
@@ -174,6 +235,59 @@ export async function deleteRealFile(path: string): Promise<boolean> {
 }
 
 /**
+ * Create a new real directory on device storage
+ */
+export async function createNativeFolder(path: string): Promise<boolean> {
+  try {
+    const isNative = await isNativePlatform();
+    if (!isNative) return true;
+    const res = await RealDeviceStorage.createDirectory({ path });
+    return res.success;
+  } catch (e) {
+    console.error('Create native folder error:', e);
+    return false;
+  }
+}
+
+/**
+ * Copy a physical file from sourcePath to targetFolderPath on Android
+ */
+export async function copyNativeFile(
+  sourcePath: string,
+  targetFolderPath: string
+): Promise<{ success: boolean; newPath?: string; name?: string; size?: number }> {
+  try {
+    const isNative = await isNativePlatform();
+    if (!isNative) return { success: true };
+    await triggerHapticFeedback(ImpactStyle.Light);
+    const res = await RealDeviceStorage.copyFile({ sourcePath, targetFolderPath });
+    return res;
+  } catch (e) {
+    console.error('Copy native file error:', e);
+    return { success: false };
+  }
+}
+
+/**
+ * Move a physical file from sourcePath to targetFolderPath on Android
+ */
+export async function moveNativeFile(
+  sourcePath: string,
+  targetFolderPath: string
+): Promise<{ success: boolean; newPath?: string; name?: string }> {
+  try {
+    const isNative = await isNativePlatform();
+    if (!isNative) return { success: true };
+    await triggerHapticFeedback(ImpactStyle.Light);
+    const res = await RealDeviceStorage.moveFile({ sourcePath, targetFolderPath });
+    return res;
+  } catch (e) {
+    console.error('Move native file error:', e);
+    return { success: false };
+  }
+}
+
+/**
  * Fetch real Storage Volumes (Internal & SD Card)
  */
 export async function getRealStorageVolumes(): Promise<{
@@ -229,15 +343,23 @@ export async function scanNativeStorage(): Promise<{
 
     if (rootDirResult && rootDirResult.files) {
       for (const f of rootDirResult.files) {
+        const webUrl = f.path.startsWith('http') || f.path.startsWith('data:') || f.path.startsWith('blob:')
+          ? f.path
+          : (typeof Capacitor !== 'undefined' && Capacitor.convertFileSrc ? Capacitor.convertFileSrc(f.path) : f.path);
+        
+        const classification = classifyFile(f.name, f.mimeType);
+        const resolvedType = f.type && f.type !== 'other' ? f.type : classification.type;
+
         collectedFiles.push({
           id: f.id,
           name: f.name,
           size: f.size,
-          type: f.type,
-          mimeType: f.mimeType,
+          type: resolvedType,
+          mimeType: f.mimeType || classification.mimeType,
           folder: f.folder,
           storageDevice: f.storageDevice || (f.path.includes('emulated') ? 'internal' : 'sdcard'),
           url: f.path,
+          thumbnail: resolvedType === 'image' || resolvedType === 'video' ? webUrl : undefined,
           createdAt: new Date(f.lastModified || Date.now()).toISOString(),
           updatedAt: new Date(f.lastModified || Date.now()).toISOString(),
         });
@@ -250,15 +372,23 @@ export async function scanNativeStorage(): Promise<{
         const catRes = await RealDeviceStorage.scanMediaCategory({ category: cat });
         if (catRes && catRes.files) {
           for (const f of catRes.files) {
+            const webUrl = f.path.startsWith('http') || f.path.startsWith('data:') || f.path.startsWith('blob:')
+              ? f.path
+              : (typeof Capacitor !== 'undefined' && Capacitor.convertFileSrc ? Capacitor.convertFileSrc(f.path) : f.path);
+
+            const classification = classifyFile(f.name, f.mimeType);
+            const resolvedType = f.type && f.type !== 'other' ? f.type : classification.type;
+
             collectedFiles.push({
               id: f.id,
               name: f.name,
               size: f.size,
-              type: f.type,
-              mimeType: f.mimeType,
+              type: resolvedType,
+              mimeType: f.mimeType || classification.mimeType,
               folder: f.folder,
               storageDevice: f.storageDevice || (f.path.includes('emulated') ? 'internal' : 'sdcard'),
               url: f.path,
+              thumbnail: resolvedType === 'image' || resolvedType === 'video' ? webUrl : undefined,
               createdAt: new Date(f.lastModified || Date.now()).toISOString(),
               updatedAt: new Date(f.lastModified || Date.now()).toISOString(),
             });

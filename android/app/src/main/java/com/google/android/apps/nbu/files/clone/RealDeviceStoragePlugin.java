@@ -27,6 +27,9 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import android.media.MediaScannerConnection;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -454,6 +457,146 @@ public class RealDeviceStoragePlugin extends Plugin {
                     output.put(item);
                 }
             }
+        }
+    }
+
+    @PluginMethod
+    public void createDirectory(PluginCall call) {
+        String path = call.getString("path");
+        if (path == null || path.isEmpty()) {
+            call.reject("Path required");
+            return;
+        }
+        try {
+            File dir = new File(path);
+            boolean created = dir.exists() || dir.mkdirs();
+            JSObject res = new JSObject();
+            res.put("success", created);
+            res.put("path", dir.getAbsolutePath());
+            call.resolve(res);
+        } catch (Exception e) {
+            call.reject("Failed to create directory: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void copyFile(PluginCall call) {
+        String sourcePath = call.getString("sourcePath");
+        String targetFolderPath = call.getString("targetFolderPath");
+        if (sourcePath == null || targetFolderPath == null) {
+            call.reject("sourcePath and targetFolderPath are required");
+            return;
+        }
+        try {
+            File src = new File(sourcePath);
+            if (!src.exists()) {
+                call.reject("Source file does not exist: " + sourcePath);
+                return;
+            }
+            File targetDir = new File(targetFolderPath);
+            if (!targetDir.exists()) {
+                targetDir.mkdirs();
+            }
+
+            String name = src.getName();
+            File dest = new File(targetDir, name);
+            if (dest.exists()) {
+                int dot = name.lastIndexOf('.');
+                String base = (dot > 0) ? name.substring(0, dot) : name;
+                String ext = (dot > 0) ? name.substring(dot) : "";
+                int counter = 1;
+                while (dest.exists()) {
+                    dest = new File(targetDir, base + "_copy" + (counter > 1 ? "_" + counter : "") + ext);
+                    counter++;
+                }
+            }
+
+            copyFileStream(src, dest);
+
+            // Rescan media store
+            MediaScannerConnection.scanFile(
+                    getContext(),
+                    new String[]{ dest.getAbsolutePath() },
+                    null,
+                    null
+            );
+
+            JSObject res = new JSObject();
+            res.put("success", true);
+            res.put("newPath", dest.getAbsolutePath());
+            res.put("name", dest.getName());
+            res.put("size", dest.length());
+            call.resolve(res);
+        } catch (Exception e) {
+            call.reject("Failed to copy file: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void moveFile(PluginCall call) {
+        String sourcePath = call.getString("sourcePath");
+        String targetFolderPath = call.getString("targetFolderPath");
+        if (sourcePath == null || targetFolderPath == null) {
+            call.reject("sourcePath and targetFolderPath are required");
+            return;
+        }
+        try {
+            File src = new File(sourcePath);
+            if (!src.exists()) {
+                call.reject("Source file does not exist: " + sourcePath);
+                return;
+            }
+            File targetDir = new File(targetFolderPath);
+            if (!targetDir.exists()) {
+                targetDir.mkdirs();
+            }
+
+            String name = src.getName();
+            File dest = new File(targetDir, name);
+            if (dest.exists()) {
+                int dot = name.lastIndexOf('.');
+                String base = (dot > 0) ? name.substring(0, dot) : name;
+                String ext = (dot > 0) ? name.substring(dot) : "";
+                int counter = 1;
+                while (dest.exists()) {
+                    dest = new File(targetDir, base + "_copy" + (counter > 1 ? "_" + counter : "") + ext);
+                    counter++;
+                }
+            }
+
+            boolean renamed = src.renameTo(dest);
+            if (!renamed) {
+                copyFileStream(src, dest);
+                src.delete();
+            }
+
+            MediaScannerConnection.scanFile(
+                    getContext(),
+                    new String[]{ sourcePath, dest.getAbsolutePath() },
+                    null,
+                    null
+            );
+
+            JSObject res = new JSObject();
+            res.put("success", true);
+            res.put("newPath", dest.getAbsolutePath());
+            res.put("name", dest.getName());
+            call.resolve(res);
+        } catch (Exception e) {
+            call.reject("Failed to move file: " + e.getMessage());
+        }
+    }
+
+    private void copyFileStream(File source, File dest) throws Exception {
+        try (FileInputStream fis = new FileInputStream(source);
+             FileOutputStream fos = new FileOutputStream(dest)) {
+            byte[] buffer = new byte[65536];
+            int length;
+            while ((length = fis.read(buffer)) > 0) {
+                fos.write(buffer, 0, length);
+            }
+            fos.flush();
+            fos.getFD().sync();
         }
     }
 

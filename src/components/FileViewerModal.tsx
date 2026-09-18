@@ -15,12 +15,15 @@ import {
   Maximize2,
   Folder,
   Play,
-  ExternalLink
+  ExternalLink,
+  FolderArchive,
+  ArrowDownToLine
 } from 'lucide-react';
 import { FileItem, Language } from '../types';
 import { formatBytes, formatDate } from '../utils/storage';
 import { translations } from '../utils/translations';
 import { openRealFile, shareNativeFile } from '../utils/nativeStorage';
+import { isArchiveFile, getArchiveBadge } from '../utils/archiveUtils';
 
 interface FileViewerModalProps {
   file: FileItem | null;
@@ -29,6 +32,7 @@ interface FileViewerModalProps {
   onToggleStar: (id: string) => void;
   onMoveToTrash: (id: string) => void;
   onDownload?: (file: FileItem) => void;
+  onExtractArchive?: (file: FileItem) => void;
 }
 
 export const FileViewerModal: React.FC<FileViewerModalProps> = ({
@@ -38,11 +42,15 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
   onToggleStar,
   onMoveToTrash,
   onDownload,
+  onExtractArchive,
 }) => {
   const [showInfo, setShowInfo] = useState(false);
   const t = translations[language];
 
   if (!file) return null;
+
+  const isArchive = isArchiveFile(file.name, file.mimeType);
+  const archiveBadge = isArchive ? getArchiveBadge(file.name) : null;
 
   const handleDownload = () => {
     if (file.url) {
@@ -232,8 +240,56 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
             </div>
           )}
 
-          {/* 5. APK / Archive / Other */}
-          {(file.type === 'apk' || file.type === 'archive' || file.type === 'other') && (
+          {/* 5. Archive Files (.zip, .rar, .7z, .tar, .gz, .iso) */}
+          {isArchive && (
+            <div className="text-center p-8 bg-neutral-900 rounded-2xl border border-neutral-800 max-w-md w-full space-y-4">
+              <div className="w-18 h-18 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto shadow-inner">
+                <FolderArchive size={42} />
+              </div>
+              <div>
+                {archiveBadge && (
+                  <span className={`inline-block mb-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${archiveBadge.bg} ${archiveBadge.color} ${archiveBadge.border}`}>
+                    {archiveBadge.label} ARCHIVE
+                  </span>
+                )}
+                <h3 className="text-base font-bold truncate text-white">{file.name}</h3>
+                <p className="text-xs text-neutral-400 mt-1">{formatBytes(file.size)} • {file.folder}</p>
+              </div>
+
+              {onExtractArchive && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    onExtractArchive(file);
+                  }}
+                  className="w-full py-3 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-neutral-950 font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
+                >
+                  <ArrowDownToLine size={18} className="text-neutral-950" />
+                  <span>{language === 'hi' ? 'फ़ाइलें अनज़िप / एक्सट्रैक्ट करें' : 'Extract Archive Files'}</span>
+                </button>
+              )}
+
+              <div className="flex items-center gap-2">
+                {file.url && (
+                  <button
+                    onClick={() => openRealFile(file.url!)}
+                    className="flex-1 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <ExternalLink size={14} /> Open in App
+                  </button>
+                )}
+                <button
+                  onClick={handleDownload}
+                  className="flex-1 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl text-xs font-medium transition-colors"
+                >
+                  Download
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 6. APK / Other */}
+          {!isArchive && (file.type === 'apk' || file.type === 'other') && (
             <div className="text-center p-8 bg-neutral-900 rounded-2xl border border-neutral-800 max-w-sm w-full space-y-3">
               <div className="w-16 h-16 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center mx-auto">
                 {file.type === 'apk' ? <Package size={36} /> : <File size={36} />}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ArrowLeft, 
   Trash2, 
@@ -12,12 +12,21 @@ import {
   Copy,
   FolderInput,
   Play,
-  Shuffle
+  Shuffle,
+  Scissors,
+  Music,
+  Film,
+  Image as ImageIcon,
+  FileText,
+  Smartphone,
+  RefreshCw,
+  FolderArchive
 } from 'lucide-react';
 import { FileCategory, FileItem, ViewMode, SortOption, Language } from '../types';
 import { filterFilesByCategory, sortFiles, formatBytes } from '../utils/storage';
 import { translations } from '../utils/translations';
 import { FileItemCard } from './FileItemCard';
+import { shareNativeFile } from '../utils/nativeStorage';
 
 interface CategoryDetailViewProps {
   category: FileCategory;
@@ -38,6 +47,13 @@ interface CategoryDetailViewProps {
   onMoveTo?: (file: FileItem) => void;
   onBatchCopy?: (files: FileItem[]) => void;
   onBatchMove?: (files: FileItem[]) => void;
+  onCopyToClipboard?: (files: FileItem[]) => void;
+  onCutToClipboard?: (files: FileItem[]) => void;
+  onQuickCopy?: (file: FileItem) => void;
+  onQuickCut?: (file: FileItem) => void;
+  onExtractArchive?: (file: FileItem) => void;
+  onCompressZip?: (files: FileItem[]) => void;
+  onRegisterSelectionClearer?: (clearer: (() => boolean) | null) => void;
 }
 
 export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
@@ -59,11 +75,45 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
   onMoveTo,
   onBatchCopy,
   onBatchMove,
+  onCopyToClipboard,
+  onCutToClipboard,
+  onQuickCopy,
+  onQuickCut,
+  onExtractArchive,
+  onCompressZip,
+  onRegisterSelectionClearer,
 }) => {
   const t = translations[language];
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchFilter, setSearchFilter] = useState('');
   const [activeSubFilter, setActiveSubFilter] = useState<string>('all');
+  const [isScanning, setIsScanning] = useState(false);
+
+  // Register selection clearer for hardware/gesture back button
+  useEffect(() => {
+    if (onRegisterSelectionClearer) {
+      if (selectedIds.length > 0) {
+        onRegisterSelectionClearer(() => {
+          setSelectedIds([]);
+          return true;
+        });
+      } else {
+        onRegisterSelectionClearer(null);
+      }
+    }
+    return () => {
+      if (onRegisterSelectionClearer) {
+        onRegisterSelectionClearer(null);
+      }
+    };
+  }, [selectedIds, onRegisterSelectionClearer]);
+
+  const handleScanCategory = () => {
+    setIsScanning(true);
+    setTimeout(() => {
+      setIsScanning(false);
+    }, 600);
+  };
 
   const categoryFiles = useMemo(() => {
     let list = filterFilesByCategory(files, category);
@@ -72,12 +122,22 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
     if (activeSubFilter !== 'all') {
       if (activeSubFilter === 'pdf') {
         list = list.filter(f => f.name.toLowerCase().endsWith('.pdf'));
+      } else if (activeSubFilter === 'office') {
+        list = list.filter(f => /\.(doc|docx|xls|xlsx|ppt|pptx|txt|rtf|csv)$/i.test(f.name));
+      } else if (activeSubFilter === 'archives') {
+        list = list.filter(f => /\.(zip|rar|7z|tar|gz|bz2)$/i.test(f.name));
       } else if (activeSubFilter === 'large') {
-        list = list.filter(f => f.size > 10 * 1024 * 1024);
+        list = list.filter(f => f.size > (category === 'videos' ? 50 * 1024 * 1024 : 10 * 1024 * 1024));
       } else if (activeSubFilter === 'camera') {
-        list = list.filter(f => f.folder.includes('Camera'));
+        list = list.filter(f => f.folder.toLowerCase().includes('camera') || f.folder.toLowerCase().includes('dcim'));
       } else if (activeSubFilter === 'screenshots') {
-        list = list.filter(f => f.folder.includes('Screenshots'));
+        list = list.filter(f => f.folder.toLowerCase().includes('screenshot'));
+      } else if (activeSubFilter === 'whatsapp') {
+        list = list.filter(f => f.folder.toLowerCase().includes('whatsapp') || f.name.toLowerCase().includes('wa'));
+      } else if (activeSubFilter === 'recordings') {
+        list = list.filter(f => f.folder.toLowerCase().includes('record') || f.folder.toLowerCase().includes('voice') || /\.(m4a|amr|opus|wav)$/i.test(f.name));
+      } else if (activeSubFilter === 'songs') {
+        list = list.filter(f => /\.(mp3|flac|wav|m4a|aac|ogg)$/i.test(f.name) && !f.folder.toLowerCase().includes('record'));
       }
     }
 
@@ -128,6 +188,19 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
     setSelectedIds([]);
   };
 
+  const handleBatchShare = () => {
+    if (selectedIds.length === 0) return;
+    const selectedFiles = files.filter(f => selectedIds.includes(f.id));
+    const urls = selectedFiles.map(f => f.url).filter(Boolean) as string[];
+    const names = selectedFiles.map(f => f.name).join(', ');
+    shareNativeFile(
+      `${selectedFiles.length} files`,
+      `Sharing: ${names}`,
+      urls[0],
+      urls
+    );
+  };
+
   const totalSize = categoryFiles.reduce((acc, f) => acc + f.size, 0);
 
   return (
@@ -136,7 +209,13 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
       <div className="flex items-center justify-between gap-3 bg-white p-3 sm:p-4 rounded-2xl border border-neutral-200/80 shadow-xs">
         <div className="flex items-center gap-3">
           <button
-            onClick={onBack}
+            onClick={() => {
+              if (selectedIds.length > 0) {
+                setSelectedIds([]);
+              } else {
+                onBack();
+              }
+            }}
             className="p-2 -ml-1 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors cursor-pointer"
             title="Go back"
           >
@@ -152,8 +231,15 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
           </div>
         </div>
 
-        {/* Action icons / Select All */}
+        {/* Action icons / Select All & Scan */}
         <div className="flex items-center gap-1.5">
+          <button
+            onClick={handleScanCategory}
+            title={language === 'hi' ? 'स्कैन और रीफ्रेश करें' : 'Scan & refresh'}
+            className="p-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg border border-neutral-200"
+          >
+            <RefreshCw size={15} className={isScanning ? 'animate-spin text-blue-600' : ''} />
+          </button>
           <button
             onClick={handleSelectAll}
             className="px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 rounded-lg flex items-center gap-1.5 border border-neutral-200"
@@ -209,6 +295,66 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
           All ({filterFilesByCategory(files, category).length})
         </button>
 
+        {category === 'audio' && (
+          <>
+            <button
+              onClick={() => setActiveSubFilter('songs')}
+              className={`px-3 py-1.5 rounded-full font-medium shrink-0 transition-colors ${
+                activeSubFilter === 'songs'
+                  ? 'bg-neutral-900 text-white'
+                  : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+              }`}
+            >
+              Songs & Music
+            </button>
+            <button
+              onClick={() => setActiveSubFilter('recordings')}
+              className={`px-3 py-1.5 rounded-full font-medium shrink-0 transition-colors ${
+                activeSubFilter === 'recordings'
+                  ? 'bg-neutral-900 text-white'
+                  : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+              }`}
+            >
+              Voice Recordings
+            </button>
+            <button
+              onClick={() => setActiveSubFilter('whatsapp')}
+              className={`px-3 py-1.5 rounded-full font-medium shrink-0 transition-colors ${
+                activeSubFilter === 'whatsapp'
+                  ? 'bg-neutral-900 text-white'
+                  : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+              }`}
+            >
+              WhatsApp Audio
+            </button>
+          </>
+        )}
+
+        {category === 'videos' && (
+          <>
+            <button
+              onClick={() => setActiveSubFilter('camera')}
+              className={`px-3 py-1.5 rounded-full font-medium shrink-0 transition-colors ${
+                activeSubFilter === 'camera'
+                  ? 'bg-neutral-900 text-white'
+                  : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+              }`}
+            >
+              Camera
+            </button>
+            <button
+              onClick={() => setActiveSubFilter('whatsapp')}
+              className={`px-3 py-1.5 rounded-full font-medium shrink-0 transition-colors ${
+                activeSubFilter === 'whatsapp'
+                  ? 'bg-neutral-900 text-white'
+                  : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+              }`}
+            >
+              WhatsApp Video
+            </button>
+          </>
+        )}
+
         {category === 'images' && (
           <>
             <button
@@ -231,20 +377,52 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
             >
               Screenshots
             </button>
+            <button
+              onClick={() => setActiveSubFilter('whatsapp')}
+              className={`px-3 py-1.5 rounded-full font-medium shrink-0 transition-colors ${
+                activeSubFilter === 'whatsapp'
+                  ? 'bg-neutral-900 text-white'
+                  : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+              }`}
+            >
+              WhatsApp Images
+            </button>
           </>
         )}
 
         {category === 'documents' && (
-          <button
-            onClick={() => setActiveSubFilter('pdf')}
-            className={`px-3 py-1.5 rounded-full font-medium shrink-0 transition-colors ${
-              activeSubFilter === 'pdf'
-                ? 'bg-neutral-900 text-white'
-                : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
-            }`}
-          >
-            PDF Documents
-          </button>
+          <>
+            <button
+              onClick={() => setActiveSubFilter('pdf')}
+              className={`px-3 py-1.5 rounded-full font-medium shrink-0 transition-colors ${
+                activeSubFilter === 'pdf'
+                  ? 'bg-neutral-900 text-white'
+                  : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+              }`}
+            >
+              PDFs
+            </button>
+            <button
+              onClick={() => setActiveSubFilter('office')}
+              className={`px-3 py-1.5 rounded-full font-medium shrink-0 transition-colors ${
+                activeSubFilter === 'office'
+                  ? 'bg-neutral-900 text-white'
+                  : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+              }`}
+            >
+              Word / Excel / Docs
+            </button>
+            <button
+              onClick={() => setActiveSubFilter('archives')}
+              className={`px-3 py-1.5 rounded-full font-medium shrink-0 transition-colors ${
+                activeSubFilter === 'archives'
+                  ? 'bg-neutral-900 text-white'
+                  : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+              }`}
+            >
+              ZIP & Archives
+            </button>
+          </>
         )}
 
         <button
@@ -255,7 +433,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
               : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
           }`}
         >
-          Large (&gt;10MB)
+          Large ({category === 'videos' ? '>50MB' : '>10MB'})
         </button>
       </div>
 
@@ -266,6 +444,42 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
             {selectedIds.length} {t.batchSelected}
           </span>
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleBatchShare}
+              className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Share selected files"
+            >
+              <Share2 size={13} />
+              <span>{language === 'hi' ? 'शेयर करें' : 'Share'}</span>
+            </button>
+            {onCopyToClipboard && (
+              <button
+                onClick={() => {
+                  const selectedFiles = files.filter(f => selectedIds.includes(f.id));
+                  onCopyToClipboard(selectedFiles);
+                  setSelectedIds([]);
+                }}
+                className="px-2.5 py-1.5 bg-white border border-blue-200 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Copy to clipboard"
+              >
+                <Copy size={13} />
+                <span>{t.copy}</span>
+              </button>
+            )}
+            {onCutToClipboard && (
+              <button
+                onClick={() => {
+                  const selectedFiles = files.filter(f => selectedIds.includes(f.id));
+                  onCutToClipboard(selectedFiles);
+                  setSelectedIds([]);
+                }}
+                className="px-2.5 py-1.5 bg-white border border-purple-200 hover:bg-purple-100 text-purple-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Cut to clipboard"
+              >
+                <Scissors size={13} />
+                <span>{t.cut}</span>
+              </button>
+            )}
             {onBatchCopy && (
               <button
                 onClick={() => {
@@ -273,7 +487,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
                   onBatchCopy(selectedFiles);
                   setSelectedIds([]);
                 }}
-                className="px-2.5 py-1.5 bg-white border border-blue-200 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="px-2.5 py-1.5 bg-white border border-neutral-200 hover:bg-neutral-100 text-neutral-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
                 title="Copy selected to SD Card or Folder"
               >
                 <Copy size={13} />
@@ -287,11 +501,25 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
                   onBatchMove(selectedFiles);
                   setSelectedIds([]);
                 }}
-                className="px-2.5 py-1.5 bg-white border border-purple-200 hover:bg-purple-100 text-purple-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="px-2.5 py-1.5 bg-white border border-neutral-200 hover:bg-neutral-100 text-neutral-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
                 title="Move selected to SD Card or Folder"
               >
                 <FolderInput size={13} />
                 <span>{t.moveTo}</span>
+              </button>
+            )}
+            {onCompressZip && (
+              <button
+                onClick={() => {
+                  const selectedFiles = files.filter(f => selectedIds.includes(f.id));
+                  onCompressZip(selectedFiles);
+                  setSelectedIds([]);
+                }}
+                className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                title="Create ZIP archive"
+              >
+                <FolderArchive size={13} />
+                <span>{language === 'hi' ? 'ZIP बनाएं' : 'ZIP'}</span>
               </button>
             )}
             <button
@@ -323,8 +551,8 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
         <div 
           className={
             viewMode === 'grid' 
-              ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3' 
-              : 'space-y-2'
+              ? 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2' 
+              : 'space-y-1.5'
           }
         >
           {categoryFiles.map(file => (
@@ -342,6 +570,10 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
               onShowInfo={onShowInfo}
               onCopyTo={onCopyTo}
               onMoveTo={onMoveTo}
+              onQuickCopy={onQuickCopy}
+              onQuickCut={onQuickCut}
+              onExtractArchive={onExtractArchive}
+              language={language}
               isSelectionMode={selectedIds.length > 0}
             />
           ))}

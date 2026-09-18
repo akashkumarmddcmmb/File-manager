@@ -12,9 +12,14 @@ import {
   Star,
   Trash2,
   Edit2,
-  Loader2
+  Loader2,
+  Scissors,
+  ClipboardPaste,
+  List,
+  Grid,
+  FolderArchive
 } from 'lucide-react';
-import { FileItem, FolderItem, ViewMode, SortOption, Language, StorageDevice } from '../types';
+import { FileItem, FolderItem, ViewMode, SortOption, Language, StorageDevice, ClipboardState } from '../types';
 import { formatBytes, sortFiles } from '../utils/storage';
 import { translations } from '../utils/translations';
 import { listRealDirectoryFiles, triggerHapticFeedback } from '../utils/nativeStorage';
@@ -25,9 +30,11 @@ interface FolderViewProps {
   folders: FolderItem[];
   files: FileItem[];
   viewMode: ViewMode;
+  onToggleViewMode?: () => void;
   sortOption: SortOption;
   language: Language;
   currentDevice?: StorageDevice;
+  clipboard?: ClipboardState | null;
   onNavigatePath: (path: string) => void;
   onBack: () => void;
   onCreateFolder: (parentPath: string) => void;
@@ -44,6 +51,15 @@ interface FolderViewProps {
   onBatchCopy?: (files: FileItem[]) => void;
   onBatchMove?: (files: FileItem[]) => void;
   onBatchTrash?: (ids: string[]) => void;
+  onCopyToClipboard?: (files: FileItem[]) => void;
+  onCutToClipboard?: (files: FileItem[]) => void;
+  onPasteClipboard?: () => void;
+  onClearClipboard?: () => void;
+  onQuickCopy?: (file: FileItem) => void;
+  onQuickCut?: (file: FileItem) => void;
+  onExtractArchive?: (file: FileItem) => void;
+  onCompressZip?: (files: FileItem[]) => void;
+  onRegisterSelectionClearer?: (clearer: (() => boolean) | null) => void;
 }
 
 export const FolderView: React.FC<FolderViewProps> = ({
@@ -51,9 +67,11 @@ export const FolderView: React.FC<FolderViewProps> = ({
   folders,
   files,
   viewMode,
+  onToggleViewMode,
   sortOption,
   language,
   currentDevice = 'internal',
+  clipboard,
   onNavigatePath,
   onBack,
   onCreateFolder,
@@ -70,9 +88,37 @@ export const FolderView: React.FC<FolderViewProps> = ({
   onBatchCopy,
   onBatchMove,
   onBatchTrash,
+  onCopyToClipboard,
+  onCutToClipboard,
+  onPasteClipboard,
+  onClearClipboard,
+  onQuickCopy,
+  onQuickCut,
+  onExtractArchive,
+  onCompressZip,
+  onRegisterSelectionClearer,
 }) => {
   const t = translations[language];
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Register selection clearer for hardware/gesture back button
+  useEffect(() => {
+    if (onRegisterSelectionClearer) {
+      if (selectedIds.length > 0) {
+        onRegisterSelectionClearer(() => {
+          setSelectedIds([]);
+          return true;
+        });
+      } else {
+        onRegisterSelectionClearer(null);
+      }
+    }
+    return () => {
+      if (onRegisterSelectionClearer) {
+        onRegisterSelectionClearer(null);
+      }
+    };
+  }, [selectedIds, onRegisterSelectionClearer]);
   const [liveItems, setLiveItems] = useState<{ files: FileItem[]; folders: FolderItem[] } | null>(null);
   const [isLoadingPath, setIsLoadingPath] = useState(false);
 
@@ -192,7 +238,11 @@ export const FolderView: React.FC<FolderViewProps> = ({
             <button
               onClick={() => {
                 triggerHapticFeedback();
-                onBack();
+                if (selectedIds.length > 0) {
+                  setSelectedIds([]);
+                } else {
+                  onBack();
+                }
               }}
               className="p-2 -ml-1 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors cursor-pointer"
               title="Back"
@@ -216,17 +266,51 @@ export const FolderView: React.FC<FolderViewProps> = ({
 
           {/* Quick Actions for this folder */}
           <div className="flex items-center gap-2">
+            {clipboard && clipboard.files.length > 0 && onPasteClipboard && (
+              <button
+                id="btn-folder-paste-quick"
+                onClick={() => {
+                  triggerHapticFeedback();
+                  onPasteClipboard();
+                }}
+                title={language === 'hi' ? 'यहाँ पेस्ट करें' : 'Paste here'}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-full text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                <ClipboardPaste size={14} />
+                <span>{language === 'hi' ? 'यहाँ पेस्ट करें' : 'Paste here'}</span>
+                <span className="bg-emerald-800/60 px-1.5 py-0.5 rounded-full text-[10px]">
+                  {clipboard.files.length}
+                </span>
+              </button>
+            )}
+            {onToggleViewMode && (
+              <button
+                id="btn-folder-view-toggle"
+                onClick={() => {
+                  triggerHapticFeedback();
+                  onToggleViewMode();
+                }}
+                title={
+                  viewMode === 'grid'
+                    ? (language === 'hi' ? 'सूची दृश्य में बदलें' : 'Switch to List view')
+                    : (language === 'hi' ? 'ग्रिड दृश्य में बदलें' : 'Switch to Grid view')
+                }
+                className="p-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors cursor-pointer"
+              >
+                {viewMode === 'grid' ? <List size={18} /> : <Grid size={18} />}
+              </button>
+            )}
             <button
               onClick={() => onCreateFolder(currentPath)}
               title={t.newFolder}
-              className="p-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors"
+              className="p-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors cursor-pointer"
             >
               <FolderPlus size={18} />
             </button>
             <button
               onClick={() => onUploadToFolder(currentPath)}
               title={t.uploadFile}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-medium transition-colors cursor-pointer"
             >
               <Upload size={14} />
               <span>{t.uploadFile}</span>
@@ -268,6 +352,48 @@ export const FolderView: React.FC<FolderViewProps> = ({
         </div>
       </div>
 
+      {/* Clipboard Active Notification Banner */}
+      {clipboard && clipboard.files.length > 0 && (
+        <div className="bg-blue-50/90 border border-blue-200/80 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-xs animate-in slide-in-from-top-2 duration-150">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
+              <ClipboardPaste size={16} />
+            </div>
+            <div className="min-w-0 text-xs">
+              <p className="font-semibold text-neutral-900 truncate">
+                {clipboard.files.length} {language === 'hi' ? 'फ़ाइलें' : 'file(s)'} {clipboard.operation === 'copy' ? (language === 'hi' ? 'कॉपी की गईं' : 'copied') : (language === 'hi' ? 'कट की गईं' : 'cut')}
+              </p>
+              <p className="text-[11px] text-neutral-500 truncate">
+                {language === 'hi' ? 'इस फ़ोल्डर में पेस्ट करने के लिए बटन दबाएं' : 'Ready to paste in this folder'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {onClearClipboard && (
+              <button
+                onClick={onClearClipboard}
+                className="px-2.5 py-1.5 text-xs text-neutral-500 hover:text-neutral-700 hover:bg-neutral-200/60 rounded-xl cursor-pointer"
+              >
+                {language === 'hi' ? 'हटाएँ' : 'Cancel'}
+              </button>
+            )}
+            {onPasteClipboard && (
+              <button
+                id="btn-folder-banner-paste"
+                onClick={() => {
+                  triggerHapticFeedback();
+                  onPasteClipboard();
+                }}
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <ClipboardPaste size={14} />
+                <span>{language === 'hi' ? 'यहाँ पेस्ट करें' : 'Paste here'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Batch Actions Bar in Folder View */}
       {selectedIds.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 p-3 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
@@ -275,6 +401,34 @@ export const FolderView: React.FC<FolderViewProps> = ({
             {selectedIds.length} {t.batchSelected}
           </span>
           <div className="flex items-center gap-1.5">
+            {onCopyToClipboard && (
+              <button
+                onClick={() => {
+                  const sel = (liveItems?.files || files).filter(f => selectedIds.includes(f.id));
+                  onCopyToClipboard(sel);
+                  setSelectedIds([]);
+                }}
+                className="px-2.5 py-1.5 bg-white border border-blue-200 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer"
+                title="Copy to clipboard"
+              >
+                <Copy size={13} />
+                <span>{t.copy}</span>
+              </button>
+            )}
+            {onCutToClipboard && (
+              <button
+                onClick={() => {
+                  const sel = (liveItems?.files || files).filter(f => selectedIds.includes(f.id));
+                  onCutToClipboard(sel);
+                  setSelectedIds([]);
+                }}
+                className="px-2.5 py-1.5 bg-white border border-purple-200 hover:bg-purple-100 text-purple-700 rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer"
+                title="Cut to clipboard"
+              >
+                <Scissors size={13} />
+                <span>{t.cut}</span>
+              </button>
+            )}
             {onBatchCopy && (
               <button
                 onClick={() => {
@@ -282,7 +436,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
                   onBatchCopy(sel);
                   setSelectedIds([]);
                 }}
-                className="px-2.5 py-1.5 bg-white border border-blue-200 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer"
+                className="px-2.5 py-1.5 bg-white border border-neutral-200 hover:bg-neutral-100 text-neutral-700 rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer"
               >
                 <Copy size={13} />
                 <span>{t.copyTo}</span>
@@ -295,10 +449,24 @@ export const FolderView: React.FC<FolderViewProps> = ({
                   onBatchMove(sel);
                   setSelectedIds([]);
                 }}
-                className="px-2.5 py-1.5 bg-white border border-purple-200 hover:bg-purple-100 text-purple-700 rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer"
+                className="px-2.5 py-1.5 bg-white border border-neutral-200 hover:bg-neutral-100 text-neutral-700 rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer"
               >
                 <FolderInput size={13} />
                 <span>{t.moveTo}</span>
+              </button>
+            )}
+            {onCompressZip && (
+              <button
+                onClick={() => {
+                  const sel = (liveItems?.files || files).filter(f => selectedIds.includes(f.id));
+                  onCompressZip(sel);
+                  setSelectedIds([]);
+                }}
+                className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer shadow-xs"
+                title="Create ZIP archive"
+              >
+                <FolderArchive size={13} />
+                <span>{language === 'hi' ? 'ZIP बनाएं' : 'ZIP'}</span>
               </button>
             )}
             {onBatchTrash && (
@@ -374,8 +542,8 @@ export const FolderView: React.FC<FolderViewProps> = ({
           <div
             className={
               viewMode === 'grid'
-                ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3'
-                : 'space-y-2'
+                ? 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2'
+                : 'space-y-1.5'
             }
           >
             {displayFiles.map(file => (
@@ -393,6 +561,10 @@ export const FolderView: React.FC<FolderViewProps> = ({
                 onShowInfo={onShowInfo}
                 onCopyTo={onCopyTo}
                 onMoveTo={onMoveTo}
+                onQuickCopy={onQuickCopy}
+                onQuickCut={onQuickCut}
+                onExtractArchive={onExtractArchive}
+                language={language}
                 isSelectionMode={selectedIds.length > 0}
               />
             ))}

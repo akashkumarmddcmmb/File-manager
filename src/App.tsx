@@ -9,9 +9,12 @@ import {
   SortOption, 
   Language,
   StorageDevice,
-  TransferTask
+  TransferTask,
+  ClipboardState,
+  UserAccount
 } from './types';
 import { computeStorage, sortFiles } from './utils/storage';
+import { classifyFile } from './utils/fileClassifier';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
 import { CleanTab } from './components/CleanTab';
@@ -32,17 +35,24 @@ import { TransferModal } from './components/TransferModal';
 import { CopyMoveDestinationModal } from './components/CopyMoveDestinationModal';
 import { GoogleDrawer } from './components/GoogleDrawer';
 import { AccountModal } from './components/AccountModal';
+import { ArchiveExtractorModal } from './components/ArchiveExtractorModal';
+import { ZipCompressModal } from './components/ZipCompressModal';
 import { FileItemCard } from './components/FileItemCard';
 import { translations } from './utils/translations';
-import { UploadCloud, CheckCircle2 } from 'lucide-react';
+import { isArchiveFile } from './utils/archiveUtils';
+import { UploadCloud, CheckCircle2, ClipboardPaste, X } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { 
   scanNativeStorage, 
   isNativePlatform, 
   checkStoragePermissionStatus, 
   requestAllFilesAccess, 
   StorageVolumeInfo,
-  openRealFile
+  openRealFile,
+  copyNativeFile,
+  moveNativeFile,
+  triggerHapticFeedback
 } from './utils/nativeStorage';
 
 const STORAGE_FILES_KEY = 'google_files_app_files_v1';
@@ -54,7 +64,17 @@ export default function App() {
   const [files, setFiles] = useState<FileItem[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_FILES_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: FileItem[] = JSON.parse(saved);
+        const initialMap = new Map(initialFiles.map(f => [f.id, f]));
+        return parsed.map(f => {
+          const init = initialMap.get(f.id);
+          if (init && init.thumbnail && !f.thumbnail) {
+            return { ...f, thumbnail: init.thumbnail };
+          }
+          return f;
+        });
+      }
     } catch (e) {
       console.error(e);
     }
@@ -211,6 +231,43 @@ export default function App() {
   // 3. Modals State
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [userAccount, setUserAccount] = useState<UserAccount | null>(() => {
+    try {
+      const saved = localStorage.getItem('google_files_user_account_v2');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
+  });
+
+  const handleSignIn = (account: UserAccount) => {
+    setUserAccount(account);
+    try {
+      localStorage.setItem('google_files_user_account_v2', JSON.stringify(account));
+    } catch (e) {
+      console.error(e);
+    }
+    showToast(
+      language === 'hi'
+        ? `${account.provider === 'google' ? 'Google' : 'Microsoft'} खाते से साइन इन किया गया`
+        : `Signed in with ${account.provider === 'google' ? 'Google' : 'Microsoft'}`
+    );
+  };
+
+  const handleSignOut = () => {
+    setUserAccount(null);
+    try {
+      localStorage.removeItem('google_files_user_account_v2');
+    } catch (e) {
+      console.error(e);
+    }
+    showToast(
+      language === 'hi'
+        ? 'सफलतापूर्वक साइन आउट किया गया'
+        : 'Signed out successfully'
+    );
+  };
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [isSafeFolderOpen, setIsSafeFolderOpen] = useState(false);
   const [isTrashOpen, setIsTrashOpen] = useState(false);
@@ -281,8 +338,48 @@ export default function App() {
     setIsAudioPlaying(true);
   };
 
+  const [archiveExtractFile, setArchiveExtractFile] = useState<FileItem | null>(null);
+  const [zipCompressFiles, setZipCompressFiles] = useState<FileItem[]>([]);
+
+  const handleExtractArchive = (file: FileItem) => {
+    setArchiveExtractFile(file);
+  };
+
+  const handleArchiveExtracted = (extractedFiles: FileItem[], deleteOriginalId?: string) => {
+    setFiles(prev => {
+      let updated = [...prev];
+      if (deleteOriginalId) {
+        updated = updated.filter(f => f.id !== deleteOriginalId);
+      }
+      return [...extractedFiles, ...updated];
+    });
+    setArchiveExtractFile(null);
+    showToast(
+      language === 'hi'
+        ? `${extractedFiles.length} फ़ाइलें सफलतापूर्वक निकाली गईं`
+        : `Successfully extracted ${extractedFiles.length} file(s)`
+    );
+  };
+
+  const handleCompressFiles = (selectedFiles: FileItem[]) => {
+    if (selectedFiles.length === 0) return;
+    setZipCompressFiles(selectedFiles);
+  };
+
+  const handleZipCreated = (createdZip: FileItem) => {
+    setFiles(prev => [createdZip, ...prev]);
+    setZipCompressFiles([]);
+    showToast(
+      language === 'hi'
+        ? `ZIP फ़ाइल तैयार: ${createdZip.name}`
+        : `ZIP archive created: ${createdZip.name}`
+    );
+  };
+
   const handleOpenPreview = (file: FileItem) => {
-    if (file.type === 'audio') {
+    if (isArchiveFile(file.name, file.mimeType)) {
+      setArchiveExtractFile(file);
+    } else if (file.type === 'audio') {
       const audios = files.filter(f => f.type === 'audio' && !f.isTrash && !f.isSafe);
       const playlist = audios.some(a => a.id === file.id) ? audios : [file, ...audios];
       setAudioPlaylist(playlist);
@@ -310,16 +407,233 @@ export default function App() {
   });
 
   const [transferTask, setTransferTask] = useState<TransferTask | null>(null);
+  const [clipboard, setClipboard] = useState<ClipboardState | null>(null);
 
   // 5. Preferences
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      const saved = localStorage.getItem('google_files_view_mode_v2');
+      if (saved === 'list' || saved === 'grid') return saved;
+    } catch (e) {
+      console.error(e);
+    }
+    return 'list'; // Default to clean, compact list view (no giant cards)
+  });
   const [sortOption, setSortOption] = useState<SortOption>('date-desc');
   const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleToggleViewMode = () => {
+    setViewMode(prev => {
+      const next: ViewMode = prev === 'grid' ? 'list' : 'grid';
+      try {
+        localStorage.setItem('google_files_view_mode_v2', next);
+      } catch (e) {
+        console.error(e);
+      }
+      return next;
+    });
+  };
 
   // Hidden file input for real uploads
   const fileInputRef = useRef<HTMLInputElement>(null);
   const targetUploadFolderRef = useRef<string>('/Download');
+
+  // Step-by-Step Back Navigation Handler
+  const selectionClearerRef = useRef<(() => boolean) | null>(null);
+  const lastBackPressTimeRef = useRef<number>(0);
+  const lastBackHandledTimestampRef = useRef<number>(0);
+
+  const handleStepBack = (): boolean => {
+    // 1. PDF Viewer open
+    if (pdfViewerFile) {
+      setPdfViewerFile(null);
+      return true;
+    }
+
+    // 2. Video Player modal open
+    if (videoPlayerFile) {
+      setVideoPlayerFile(null);
+      return true;
+    }
+
+    // 3. Audio Player full modal open (minimize to background/mini-player, keep playing)
+    if (isAudioPlayerOpen) {
+      setIsAudioPlayerOpen(false);
+      return true;
+    }
+
+    // 4. File preview/info modal open
+    if (previewFile) {
+      setPreviewFile(null);
+      return true;
+    }
+
+    // 5. Rename dialog open
+    if (renameTarget) {
+      setRenameTarget(null);
+      return true;
+    }
+
+    // 6. New folder dialog open
+    if (newFolderParentPath !== null) {
+      setNewFolderParentPath(null);
+      return true;
+    }
+
+    // 7. Copy/Move destination modal open
+    if (copyMoveModal.isOpen) {
+      setCopyMoveModal({ isOpen: false, operation: 'copy', files: [] });
+      return true;
+    }
+
+    // 8. Live transfer status modal open
+    if (transferTask) {
+      setTransferTask(null);
+      return true;
+    }
+
+    // 9. Safe folder modal open
+    if (isSafeFolderOpen) {
+      setIsSafeFolderOpen(false);
+      return true;
+    }
+
+    // 10. Trash modal open
+    if (isTrashOpen) {
+      setIsTrashOpen(false);
+      return true;
+    }
+
+    // 11. Storage breakdown modal open
+    if (isStorageBreakdownOpen) {
+      setIsStorageBreakdownOpen(false);
+      return true;
+    }
+
+    // 12. Account modal open
+    if (isAccountOpen) {
+      setIsAccountOpen(false);
+      return true;
+    }
+
+    // 13. Side drawer open
+    if (isDrawerOpen) {
+      setIsDrawerOpen(false);
+      return true;
+    }
+
+    // 14. Active search query filter
+    if (searchQuery.trim().length > 0) {
+      setSearchQuery('');
+      return true;
+    }
+
+    // 15. If multiple items are selected in Category or Folder view, clear selection first
+    if (selectionClearerRef.current && selectionClearerRef.current()) {
+      return true;
+    }
+
+    // 16. Inside Folder view: navigate up one directory level or close folder view
+    if (isFolderViewOpen) {
+      const rootPath = activeStorageDevice === 'sdcard' && realVolumes?.sdcard?.path
+        ? realVolumes.sdcard.path
+        : (realVolumes?.internal?.path || '/storage/emulated/0');
+      
+      const normCurrent = currentFolderPath.replace(/\/$/, '') || '/';
+      const normRoot = rootPath.replace(/\/$/, '') || '/';
+
+      if (
+        normCurrent === '/' || 
+        normCurrent === normRoot || 
+        normCurrent === '/storage/emulated/0'
+      ) {
+        setIsFolderViewOpen(false);
+      } else {
+        const lastSlash = normCurrent.lastIndexOf('/');
+        const parent = lastSlash > 0 ? normCurrent.substring(0, lastSlash) : normRoot;
+        if (parent.length < normRoot.length || normCurrent === normRoot) {
+          setIsFolderViewOpen(false);
+        } else {
+          setCurrentFolderPath(parent);
+        }
+      }
+      return true;
+    }
+
+    // 17. Inside a Category view (e.g. Downloads, Images, Videos, Audio, Documents, Apps, Starred)
+    if (selectedCategory !== null) {
+      setSelectedCategory(null);
+      return true;
+    }
+
+    // 18. Not on Browse tab (e.g. Clean tab or Share tab active)
+    if (activeTab !== 'browse') {
+      setActiveTab('browse');
+      return true;
+    }
+
+    // 19. At the Root view of the app (Browse tab root): Double-back to exit protection
+    const now = Date.now();
+    if (now - lastBackPressTimeRef.current < 2000) {
+      try {
+        CapacitorApp.exitApp();
+      } catch (e) {
+        console.warn('Capacitor exitApp not available:', e);
+      }
+    } else {
+      lastBackPressTimeRef.current = now;
+      showToast(
+        language === 'hi'
+          ? 'ऐप बंद करने के लिए एक बार और बैक दबाएं'
+          : 'Press back again to exit'
+      );
+    }
+    return false;
+  };
+
+  const backHandlerRef = useRef(handleStepBack);
+  backHandlerRef.current = handleStepBack;
+
+  // Intercept Android hardware back button, edge gestures, and browser popstate
+  useEffect(() => {
+    let removeListener: (() => void) | null = null;
+
+    const triggerStepBack = () => {
+      const now = Date.now();
+      // Debounce to prevent double step-backs if both native and popstate fire
+      if (now - lastBackHandledTimestampRef.current < 250) {
+        return;
+      }
+      lastBackHandledTimestampRef.current = now;
+      if (backHandlerRef.current) {
+        backHandlerRef.current();
+      }
+    };
+
+    const initNativeBackHandler = async () => {
+      try {
+        const handle = await CapacitorApp.addListener('backButton', () => {
+          triggerStepBack();
+        });
+        removeListener = () => handle.remove();
+      } catch (err) {
+        console.warn('Capacitor backButton not available on this platform:', err);
+      }
+    };
+
+    initNativeBackHandler();
+
+    const handlePopState = () => {
+      triggerStepBack();
+    };
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      if (removeListener) removeListener();
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   const t = translations[language];
 
@@ -339,21 +653,7 @@ export default function App() {
     Array.from(fileList).forEach(file => {
       const p = new Promise<void>((resolve) => {
         const reader = new FileReader();
-
-        let type: FileItem['type'] = 'other';
-        if (file.type.startsWith('image/')) type = 'image';
-        else if (file.type.startsWith('video/')) type = 'video';
-        else if (file.type.startsWith('audio/')) type = 'audio';
-        else if (
-          file.type.includes('pdf') ||
-          file.type.includes('document') ||
-          file.type.includes('sheet') ||
-          file.type.includes('text')
-        ) {
-          type = 'document';
-        } else if (file.name.endsWith('.apk')) {
-          type = 'apk';
-        }
+        const { type, mimeType } = classifyFile(file.name, file.type);
 
         reader.onload = () => {
           const result = reader.result as string;
@@ -362,22 +662,20 @@ export default function App() {
             name: file.name,
             size: file.size,
             type,
-            mimeType: file.type || 'application/octet-stream',
+            mimeType,
             folder: targetFolder,
             storageDevice: isFolderViewOpen ? activeStorageDevice : 'internal',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-            url: type === 'image' || type === 'video' || type === 'audio' ? result : undefined,
-            thumbnail: type === 'image' ? result : undefined,
+            url: result,
+            thumbnail: type === 'image' || type === 'video' ? result : undefined,
             content: type === 'document' && file.type.includes('text') ? result : undefined,
             isLarge: file.size > 10 * 1024 * 1024,
           });
           resolve();
         };
 
-        if (type === 'image' || type === 'video' || type === 'audio') {
-          reader.readAsDataURL(file);
-        } else if (file.type.includes('text')) {
+        if (type === 'document' && file.type.includes('text')) {
           reader.readAsText(file);
         } else {
           reader.readAsDataURL(file);
@@ -546,12 +844,48 @@ export default function App() {
     });
   };
 
+  const handleQuickCopy = (fileOrFiles: FileItem | FileItem[]) => {
+    const list = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles];
+    if (list.length === 0) return;
+    setClipboard({
+      operation: 'copy',
+      files: list,
+    });
+    triggerHapticFeedback();
+    showToast(
+      language === 'hi'
+        ? `${list.length} फ़ाइल क्लिपबोर्ड में कॉपी की गई`
+        : `${list.length} file(s) copied to clipboard`
+    );
+  };
+
+  const handleQuickCut = (fileOrFiles: FileItem | FileItem[]) => {
+    const list = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles];
+    if (list.length === 0) return;
+    setClipboard({
+      operation: 'move',
+      files: list,
+    });
+    triggerHapticFeedback();
+    showToast(
+      language === 'hi'
+        ? `${list.length} फ़ाइल कट की गई (Move)`
+        : `${list.length} file(s) cut to clipboard`
+    );
+  };
+
+  const handleClearClipboard = () => {
+    setClipboard(null);
+  };
+
   const handleConfirmTransfer = (
     targetDevice: StorageDevice,
     targetFolder: string,
-    initialSpeedMbps: number
+    initialSpeedMbps: number,
+    customTransfer?: { operation: 'copy' | 'move'; files: FileItem[] }
   ) => {
-    const filesToTransfer = copyMoveModal.files;
+    const filesToTransfer = customTransfer ? customTransfer.files : copyMoveModal.files;
+    const op = customTransfer ? customTransfer.operation : copyMoveModal.operation;
     if (filesToTransfer.length === 0) return;
 
     const totalBytes = filesToTransfer.reduce((sum, f) => sum + f.size, 0);
@@ -560,7 +894,7 @@ export default function App() {
 
     const newTask: TransferTask = {
       id: `task-${Date.now()}`,
-      operation: copyMoveModal.operation,
+      operation: op,
       files: filesToTransfer,
       totalBytes,
       transferredBytes: 0,
@@ -576,6 +910,32 @@ export default function App() {
 
     setTransferTask(newTask);
     setCopyMoveModal({ isOpen: false, operation: 'copy', files: [] });
+  };
+
+  const handlePasteClipboard = (targetFolder?: string, targetDevice?: StorageDevice) => {
+    if (!clipboard || clipboard.files.length === 0) return;
+
+    let destFolder = targetFolder;
+    let destDevice = targetDevice || activeStorageDevice;
+
+    if (!destFolder) {
+      if (isFolderViewOpen && currentFolderPath) {
+        destFolder = currentFolderPath;
+        destDevice = activeStorageDevice;
+      } else {
+        const rootPath = (activeStorageDevice === 'sdcard' && realVolumes?.sdcard?.path)
+          ? realVolumes.sdcard.path
+          : (realVolumes?.internal?.path || '/storage/emulated/0');
+        destFolder = rootPath;
+        destDevice = activeStorageDevice;
+      }
+    }
+
+    handleConfirmTransfer(destDevice, destFolder, 65, clipboard);
+
+    if (clipboard.operation === 'move') {
+      setClipboard(null);
+    }
   };
 
   // Real-time transfer simulation loop
@@ -650,8 +1010,32 @@ export default function App() {
 
           const targetLabel = prev.targetDevice === 'sdcard' ? 'SD Card' : 'Internal Storage';
           showToast(
-            `${prev.files.length} ${prev.operation === 'move' ? 'moved' : 'copied'} to ${targetLabel}`
+            language === 'hi'
+              ? `${prev.files.length} फ़ाइलें ${prev.operation === 'move' ? 'स्थानांतरित (Move)' : 'कॉपी'} की गईं: ${targetLabel}`
+              : `${prev.files.length} ${prev.operation === 'move' ? 'moved' : 'copied'} to ${targetLabel}`
           );
+
+          // Execute real native file operations if running on Android device
+          (async () => {
+            try {
+              const isNat = await isNativePlatform();
+              if (isNat) {
+                for (const f of prev.files) {
+                  const srcPath = f.url || (f as any).path;
+                  if (srcPath && srcPath.startsWith('/')) {
+                    if (prev.operation === 'move') {
+                      await moveNativeFile(srcPath, prev.targetFolder);
+                    } else {
+                      await copyNativeFile(srcPath, prev.targetFolder);
+                    }
+                  }
+                }
+                await loadRealDeviceStorage();
+              }
+            } catch (err) {
+              console.error('Native file transfer error:', err);
+            }
+          })();
 
           return {
             ...prev,
@@ -756,7 +1140,7 @@ export default function App() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         viewMode={viewMode}
-        onToggleViewMode={() => setViewMode(v => (v === 'grid' ? 'list' : 'grid'))}
+        onToggleViewMode={handleToggleViewMode}
         sortOption={sortOption}
         onSelectSortOption={setSortOption}
         language={language}
@@ -766,6 +1150,7 @@ export default function App() {
         onOpenStorageBreakdown={() => setIsStorageBreakdownOpen(true)}
         onOpenDrawer={() => setIsDrawerOpen(true)}
         onOpenAccount={() => setIsAccountOpen(true)}
+        userAccount={userAccount}
       />
 
       {/* Toast Notification Banner */}
@@ -803,8 +1188,8 @@ export default function App() {
               <div
                 className={
                   viewMode === 'grid'
-                    ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3'
-                    : 'space-y-2'
+                    ? 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2'
+                    : 'space-y-1.5'
                 }
               >
                 {activeSearchResults.map(file => (
@@ -822,6 +1207,9 @@ export default function App() {
                     onShowInfo={setPreviewFile}
                     onCopyTo={handleInitiateCopy}
                     onMoveTo={handleInitiateMove}
+                    onQuickCopy={handleQuickCopy}
+                    onQuickCut={handleQuickCut}
+                    language={language}
                     isSelectionMode={false}
                   />
                 ))}
@@ -835,6 +1223,7 @@ export default function App() {
             folders={folders}
             files={files}
             viewMode={viewMode}
+            onToggleViewMode={handleToggleViewMode}
             sortOption={sortOption}
             language={language}
             currentDevice={activeStorageDevice}
@@ -871,6 +1260,16 @@ export default function App() {
             onBatchCopy={handleInitiateCopy}
             onBatchMove={handleInitiateMove}
             onBatchTrash={handleBatchTrash}
+            clipboard={clipboard}
+            onCopyToClipboard={handleQuickCopy}
+            onCutToClipboard={handleQuickCut}
+            onPasteClipboard={handlePasteClipboard}
+            onClearClipboard={handleClearClipboard}
+            onQuickCopy={handleQuickCopy}
+            onQuickCut={handleQuickCut}
+            onExtractArchive={handleExtractArchive}
+            onCompressZip={handleCompressFiles}
+            onRegisterSelectionClearer={(clearer) => { selectionClearerRef.current = clearer; }}
           />
         ) : selectedCategory ? (
           /* Specific Category Drilled-in View (Downloads, Images, Videos, Audio, Documents, Apps, Starred) */
@@ -893,6 +1292,13 @@ export default function App() {
             onMoveTo={handleInitiateMove}
             onBatchCopy={handleInitiateCopy}
             onBatchMove={handleInitiateMove}
+            onCopyToClipboard={handleQuickCopy}
+            onCutToClipboard={handleQuickCut}
+            onQuickCopy={handleQuickCopy}
+            onQuickCut={handleQuickCut}
+            onExtractArchive={handleExtractArchive}
+            onCompressZip={handleCompressFiles}
+            onRegisterSelectionClearer={(clearer) => { selectionClearerRef.current = clearer; }}
           />
         ) : (
           /* Primary Tabs: Clean, Browse, Share */
@@ -945,11 +1351,59 @@ export default function App() {
             )}
 
             {activeTab === 'share' && (
-              <ShareTab files={files} language={language} />
+              <ShareTab 
+                files={files} 
+                language={language} 
+                onAddReceivedFiles={(newItems) => {
+                  setFiles(prev => [...newItems, ...prev]);
+                }}
+              />
             )}
           </>
         )}
       </main>
+
+      {/* Floating Clipboard Bar (when files are copied/cut) */}
+      {clipboard && clipboard.files.length > 0 && (
+        <div 
+          id="floating-clipboard-bar"
+          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md bg-neutral-900/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-xl border border-neutral-700/60 flex items-center justify-between gap-3 animate-in slide-in-from-bottom-3 duration-200"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+              <ClipboardPaste size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold truncate">
+                {clipboard.files.length} {language === 'hi' ? 'फ़ाइल' : 'file(s)'} {clipboard.operation === 'copy' ? (language === 'hi' ? 'कॉपी की गई' : 'copied') : (language === 'hi' ? 'कट की गई' : 'cut')}
+              </p>
+              <p className="text-[11px] text-neutral-400 truncate">
+                {isFolderViewOpen
+                  ? (language === 'hi' ? 'इस फ़ोल्डर में पेस्ट करने के लिए टैप करें' : 'Tap to paste in this folder')
+                  : (language === 'hi' ? 'फ़ोल्डर खोलें या यहाँ पेस्ट करें' : 'Browse to folder or tap to paste')}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={handleClearClipboard}
+              className="p-1.5 text-neutral-400 hover:text-white rounded-lg cursor-pointer"
+              title={language === 'hi' ? 'रद्द करें' : 'Cancel'}
+            >
+              <X size={16} />
+            </button>
+            <button
+              id="btn-floating-paste"
+              onClick={() => handlePasteClipboard()}
+              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+            >
+              <ClipboardPaste size={14} />
+              <span>{language === 'hi' ? 'पेस्ट करें' : 'Paste'}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Material 3 Bottom Navigation */}
       <Navigation
@@ -971,6 +1425,10 @@ export default function App() {
         onClose={() => setPreviewFile(null)}
         onToggleStar={handleToggleStar}
         onMoveToTrash={handleMoveToTrash}
+        onExtractArchive={(file) => {
+          setPreviewFile(null);
+          handleExtractArchive(file);
+        }}
       />
 
       <SafeFolderModal
@@ -1060,21 +1518,22 @@ export default function App() {
         onOpenTrash={() => setIsTrashOpen(true)}
         onOpenStorageBreakdown={() => setIsStorageBreakdownOpen(true)}
         onOpenAccount={() => setIsAccountOpen(true)}
-        userEmail="akashkumarmddcmmb@gmail.com"
-        userName="Akash Kumar"
+        userAccount={userAccount}
       />
 
-      {/* Google Account Profile Popover Sheet */}
+      {/* Google & Microsoft Account Profile / Sign-in Modal */}
       <AccountModal
         isOpen={isAccountOpen}
         onClose={() => setIsAccountOpen(false)}
         storage={storage}
-        userEmail="akashkumarmddcmmb@gmail.com"
-        userName="Akash Kumar"
+        userAccount={userAccount}
+        onSignIn={handleSignIn}
+        onSignOut={handleSignOut}
         onOpenStorageBreakdown={() => {
           setIsAccountOpen(false);
           setIsStorageBreakdownOpen(true);
         }}
+        language={language}
       />
 
       {/* Hidden Global Audio Element for Background Music Playback */}
@@ -1168,6 +1627,28 @@ export default function App() {
         language={language}
         onClose={() => setPdfViewerFile(null)}
         onToggleStar={handleToggleStar}
+      />
+
+      {/* Archive Extractor Modal (ZIP, RAR, 7Z, TAR, GZ) */}
+      <ArchiveExtractorModal
+        isOpen={archiveExtractFile !== null}
+        file={archiveExtractFile}
+        folders={folders}
+        currentFolder={currentFolderPath}
+        language={language}
+        onClose={() => setArchiveExtractFile(null)}
+        onExtracted={handleArchiveExtracted}
+      />
+
+      {/* Archive Compressor Modal (Create ZIP) */}
+      <ZipCompressModal
+        isOpen={zipCompressFiles.length > 0}
+        filesToCompress={zipCompressFiles}
+        folders={folders}
+        currentFolder={currentFolderPath}
+        language={language}
+        onClose={() => setZipCompressFiles([])}
+        onZipCreated={handleZipCreated}
       />
     </div>
   );

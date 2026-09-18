@@ -17,11 +17,15 @@ import {
   FolderInput,
   Share2,
   Play,
-  ExternalLink
+  ExternalLink,
+  Scissors,
+  FolderArchive
 } from 'lucide-react';
-import { FileItem, ViewMode } from '../types';
+import { FileItem, ViewMode, Language } from '../types';
 import { formatBytes, formatDate } from '../utils/storage';
 import { triggerHapticFeedback, shareNativeFile, openRealFile } from '../utils/nativeStorage';
+import { isArchiveFile, getArchiveBadge } from '../utils/archiveUtils';
+import { FileMediaThumbnail } from './FileMediaThumbnail';
 
 interface FileItemCardProps {
   file: FileItem;
@@ -36,6 +40,10 @@ interface FileItemCardProps {
   onShowInfo: (file: FileItem) => void;
   onCopyTo?: (file: FileItem) => void;
   onMoveTo?: (file: FileItem) => void;
+  onQuickCopy?: (file: FileItem) => void;
+  onQuickCut?: (file: FileItem) => void;
+  onExtractArchive?: (file: FileItem) => void;
+  language?: Language;
   isSelectionMode: boolean;
 }
 
@@ -52,9 +60,15 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
   onShowInfo,
   onCopyTo,
   onMoveTo,
+  onQuickCopy,
+  onQuickCut,
+  onExtractArchive,
+  language = 'en',
   isSelectionMode,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
+  const isArchive = isArchiveFile(file.name, file.mimeType);
+  const archiveBadge = isArchive ? getArchiveBadge(file.name) : null;
 
   const getFileIcon = () => {
     switch (file.type) {
@@ -76,6 +90,8 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
   const handleCardClick = (e: React.MouseEvent) => {
     if (isSelectionMode) {
       onToggleSelect(file.id);
+    } else if (isArchive && onExtractArchive) {
+      onExtractArchive(file);
     } else {
       onOpenPreview(file);
     }
@@ -110,21 +126,28 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
 
           {/* Thumbnail / Icon */}
           <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-neutral-100 border border-neutral-200/50">
-            {file.thumbnail ? (
-              <img 
-                src={file.thumbnail} 
-                alt={file.name} 
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover" 
-              />
+            {isArchive ? (
+              <div className="w-full h-full bg-amber-50 flex items-center justify-center text-amber-700">
+                <FolderArchive size={20} />
+              </div>
             ) : (
-              getFileIcon()
+              <FileMediaThumbnail
+                file={file}
+                className="w-full h-full"
+                showBadge={false}
+                showPlayOverlay={false}
+              />
             )}
           </div>
 
           {/* Name & Details */}
           <div className="min-w-0 flex-1 pr-2">
             <div className="flex items-center gap-1.5">
+              {archiveBadge && (
+                <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider border shrink-0 ${archiveBadge.bg} ${archiveBadge.color} ${archiveBadge.border}`}>
+                  {archiveBadge.label}
+                </span>
+              )}
               <span className="text-xs font-medium text-neutral-900 truncate" title={file.name}>
                 {file.name}
               </span>
@@ -150,13 +173,22 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
           {showMenu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 mt-1 w-44 bg-white border border-neutral-200 rounded-xl shadow-lg z-50 py-1 text-xs text-neutral-700 animate-in fade-in zoom-in-95">
+              <div className="absolute right-0 mt-1 w-48 bg-white border border-neutral-200 rounded-xl shadow-lg z-50 py-1 text-xs text-neutral-700 animate-in fade-in zoom-in-95">
+                {isArchive && onExtractArchive && (
+                  <button
+                    onClick={() => { setShowMenu(false); onExtractArchive(file); }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-amber-100/70 flex items-center gap-2 font-bold text-amber-900 bg-amber-50"
+                  >
+                    <FolderArchive size={14} className="text-amber-600" />
+                    {language === 'hi' ? 'अनज़िप / एक्सट्रैक्ट करें' : 'Extract Archive'}
+                  </button>
+                )}
                 <button
                   onClick={() => { setShowMenu(false); onOpenPreview(file); }}
                   className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 font-medium text-neutral-800"
                 >
-                  {file.type === 'audio' ? <Music size={14} className="text-amber-500" /> : file.type === 'video' ? <Film size={14} className="text-rose-500" /> : file.type === 'document' ? <FileText size={14} className="text-emerald-500" /> : <Info size={14} />}
-                  {file.type === 'audio' ? 'Play Song' : file.type === 'video' ? 'Play Video' : file.type === 'document' ? 'Read Document' : 'Open Preview'}
+                  {file.type === 'audio' ? <Music size={14} className="text-amber-500" /> : file.type === 'video' ? <Film size={14} className="text-rose-500" /> : file.type === 'document' ? <FileText size={14} className="text-emerald-500" /> : isArchive ? <FolderArchive size={14} className="text-amber-600" /> : <Info size={14} />}
+                  {file.type === 'audio' ? 'Play Song' : file.type === 'video' ? 'Play Video' : file.type === 'document' ? 'Read Document' : isArchive ? 'Inspect Archive' : 'Open Preview'}
                 </button>
                 {file.url && (
                   <button
@@ -193,12 +225,28 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
                     <Shield size={14} /> Move to Safe Folder
                   </button>
                 )}
+                {onQuickCopy && (
+                  <button
+                    onClick={() => { setShowMenu(false); onQuickCopy(file); }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-neutral-800 font-medium"
+                  >
+                    <Copy size={14} className="text-blue-600" /> {language === 'hi' ? 'कॉपी करें' : 'Copy'}
+                  </button>
+                )}
+                {onQuickCut && (
+                  <button
+                    onClick={() => { setShowMenu(false); onQuickCut(file); }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-neutral-800 font-medium"
+                  >
+                    <Scissors size={14} className="text-purple-600" /> {language === 'hi' ? 'कट करें (Move)' : 'Cut'}
+                  </button>
+                )}
                 {onCopyTo && (
                   <button
                     onClick={() => { setShowMenu(false); onCopyTo(file); }}
                     className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-neutral-800"
                   >
-                    <Copy size={14} className="text-blue-600" /> Copy to...
+                    <FolderInput size={14} className="text-blue-600" /> {language === 'hi' ? 'यहाँ कॉपी करें...' : 'Copy to...'}
                   </button>
                 )}
                 {onMoveTo && (
@@ -206,7 +254,7 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
                     onClick={() => { setShowMenu(false); onMoveTo(file); }}
                     className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-neutral-800"
                   >
-                    <FolderInput size={14} className="text-purple-600" /> Move to...
+                    <FolderInput size={14} className="text-purple-600" /> {language === 'hi' ? 'यहाँ ले जाएँ...' : 'Move to...'}
                   </button>
                 )}
                 {onRename && (
@@ -248,19 +296,13 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
       onClick={handleCardClick}
     >
       {/* Top Media / Thumbnail container */}
-      <div className="relative w-full aspect-4/3 bg-neutral-100 flex items-center justify-center overflow-hidden">
-        {file.thumbnail ? (
-          <img 
-            src={file.thumbnail} 
-            alt={file.name} 
-            referrerPolicy="no-referrer"
-            className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300" 
-          />
-        ) : (
-          <div className="w-12 h-12 rounded-xl bg-neutral-200/60 flex items-center justify-center">
-            {getFileIcon()}
-          </div>
-        )}
+      <div className="relative w-full aspect-4/3 max-h-28 sm:max-h-32 bg-neutral-100 flex items-center justify-center overflow-hidden">
+        <FileMediaThumbnail
+          file={file}
+          className="w-full h-full"
+          showBadge={false}
+          showPlayOverlay={false}
+        />
 
         {/* Selection Checkbox (Top Left) */}
         <div 
@@ -304,15 +346,22 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
             {file.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'DOC'}
           </div>
         )}
+
+        {/* Archive Badge */}
+        {isArchive && archiveBadge && (
+          <div className={`absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider shadow-xs pointer-events-none border ${archiveBadge.bg} ${archiveBadge.color} ${archiveBadge.border}`}>
+            {archiveBadge.label}
+          </div>
+        )}
       </div>
 
       {/* Card Info Footer */}
-      <div className="p-3 flex items-start justify-between gap-1.5">
+      <div className="p-2 sm:p-2.5 flex items-start justify-between gap-1">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-neutral-900 truncate" title={file.name}>
+          <p className="text-[11px] sm:text-xs font-medium text-neutral-900 truncate" title={file.name}>
             {file.name}
           </p>
-          <p className="text-[11px] text-neutral-400 pt-0.5">
+          <p className="text-[10px] text-neutral-400 pt-0.5">
             {formatBytes(file.size)}
           </p>
         </div>
@@ -329,13 +378,22 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
           {showMenu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 bottom-full mb-1 w-44 bg-white border border-neutral-200 rounded-xl shadow-lg z-50 py-1 text-xs text-neutral-700 animate-in fade-in zoom-in-95">
+              <div className="absolute right-0 bottom-full mb-1 w-48 bg-white border border-neutral-200 rounded-xl shadow-lg z-50 py-1 text-xs text-neutral-700 animate-in fade-in zoom-in-95">
+                {isArchive && onExtractArchive && (
+                  <button
+                    onClick={() => { setShowMenu(false); onExtractArchive(file); }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-amber-100/70 flex items-center gap-2 font-bold text-amber-900 bg-amber-50"
+                  >
+                    <FolderArchive size={14} className="text-amber-600" />
+                    {language === 'hi' ? 'अनज़िप / एक्सट्रैक्ट करें' : 'Extract Archive'}
+                  </button>
+                )}
                 <button
                   onClick={() => { setShowMenu(false); onOpenPreview(file); }}
                   className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 font-medium text-neutral-800"
                 >
-                  {file.type === 'audio' ? <Music size={14} className="text-amber-500" /> : file.type === 'video' ? <Film size={14} className="text-rose-500" /> : file.type === 'document' ? <FileText size={14} className="text-emerald-500" /> : <Info size={14} />}
-                  {file.type === 'audio' ? 'Play Song' : file.type === 'video' ? 'Play Video' : file.type === 'document' ? 'Read Document' : 'Open'}
+                  {file.type === 'audio' ? <Music size={14} className="text-amber-500" /> : file.type === 'video' ? <Film size={14} className="text-rose-500" /> : file.type === 'document' ? <FileText size={14} className="text-emerald-500" /> : isArchive ? <FolderArchive size={14} className="text-amber-600" /> : <Info size={14} />}
+                  {file.type === 'audio' ? 'Play Song' : file.type === 'video' ? 'Play Video' : file.type === 'document' ? 'Read Document' : isArchive ? 'Inspect Archive' : 'Open'}
                 </button>
                 {file.url && (
                   <button
@@ -372,12 +430,28 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
                     <Shield size={14} /> Move to Safe Folder
                   </button>
                 )}
+                {onQuickCopy && (
+                  <button
+                    onClick={() => { setShowMenu(false); onQuickCopy(file); }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-neutral-800 font-medium"
+                  >
+                    <Copy size={14} className="text-blue-600" /> {language === 'hi' ? 'कॉपी करें' : 'Copy'}
+                  </button>
+                )}
+                {onQuickCut && (
+                  <button
+                    onClick={() => { setShowMenu(false); onQuickCut(file); }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-neutral-800 font-medium"
+                  >
+                    <Scissors size={14} className="text-purple-600" /> {language === 'hi' ? 'कट करें (Move)' : 'Cut'}
+                  </button>
+                )}
                 {onCopyTo && (
                   <button
                     onClick={() => { setShowMenu(false); onCopyTo(file); }}
                     className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-neutral-800"
                   >
-                    <Copy size={14} className="text-blue-600" /> Copy to...
+                    <FolderInput size={14} className="text-blue-600" /> {language === 'hi' ? 'यहाँ कॉपी करें...' : 'Copy to...'}
                   </button>
                 )}
                 {onMoveTo && (
@@ -385,7 +459,7 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
                     onClick={() => { setShowMenu(false); onMoveTo(file); }}
                     className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-neutral-800"
                   >
-                    <FolderInput size={14} className="text-purple-600" /> Move to...
+                    <FolderInput size={14} className="text-purple-600" /> {language === 'hi' ? 'यहाँ ले जाएँ...' : 'Move to...'}
                   </button>
                 )}
                 {onRename && (

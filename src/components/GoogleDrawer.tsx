@@ -10,15 +10,16 @@ import {
   Settings, 
   HelpCircle, 
   Languages, 
-  CreditCard,
-  ChevronRight,
-  ExternalLink,
-  Info
+  ChevronRight, 
+  Info,
+  User,
+  LogIn
 } from 'lucide-react';
-import { TabType, Language, StorageBreakdown } from '../types';
+import { TabType, Language, StorageBreakdown, UserAccount } from '../types';
 import { GoogleFilesLogo } from './GoogleFilesLogo';
 import { formatBytes } from '../utils/storage';
 import { translations } from '../utils/translations';
+import { GoogleLogoIcon, MicrosoftLogoIcon } from './AccountModal';
 
 interface GoogleDrawerProps {
   isOpen: boolean;
@@ -32,8 +33,7 @@ interface GoogleDrawerProps {
   onOpenTrash: () => void;
   onOpenStorageBreakdown: () => void;
   onOpenAccount: () => void;
-  userEmail?: string;
-  userName?: string;
+  userAccount?: UserAccount | null;
 }
 
 export const GoogleDrawer: React.FC<GoogleDrawerProps> = ({
@@ -48,8 +48,7 @@ export const GoogleDrawer: React.FC<GoogleDrawerProps> = ({
   onOpenTrash,
   onOpenStorageBreakdown,
   onOpenAccount,
-  userEmail = 'akashkumarmddcmmb@gmail.com',
-  userName = 'Akash Kumar',
+  userAccount,
 }) => {
   const [showHelp, setShowHelp] = useState(false);
   const t = translations[language];
@@ -93,24 +92,43 @@ export const GoogleDrawer: React.FC<GoogleDrawerProps> = ({
           </button>
         </div>
 
-        {/* User Account Card */}
+        {/* User Account Section */}
         <div 
           onClick={() => {
             onClose();
             onOpenAccount();
           }}
-          className="mx-4 mt-3 p-3 bg-blue-50/60 hover:bg-blue-50 border border-blue-100 rounded-2xl flex items-center justify-between cursor-pointer transition-colors group"
+          className={`mx-4 mt-3 p-3 rounded-2xl flex items-center justify-between cursor-pointer transition-colors group border ${
+            userAccount 
+              ? 'bg-neutral-50 hover:bg-blue-50/60 border-neutral-200/80' 
+              : 'bg-blue-50/70 hover:bg-blue-100/70 border-blue-200/80'
+          }`}
         >
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold text-sm shadow-xs shrink-0 ring-2 ring-blue-100">
-              {userName.charAt(0)}
-            </div>
+            {userAccount ? (
+              <div className="relative shrink-0">
+                <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs ring-2 ring-blue-100">
+                  {userAccount.name ? userAccount.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div className="absolute -bottom-1 -right-1 bg-white p-0.5 rounded-full shadow-xs border border-neutral-200">
+                  {userAccount.provider === 'google' ? (
+                    <GoogleLogoIcon size={12} />
+                  ) : (
+                    <MicrosoftLogoIcon size={12} />
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0 ring-2 ring-blue-100">
+                <User size={20} />
+              </div>
+            )}
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-neutral-900 truncate group-hover:text-blue-600 transition-colors">
-                {userName}
+              <p className="text-xs font-bold text-neutral-900 group-hover:text-blue-600 transition-colors truncate">
+                {userAccount ? userAccount.name : t.signIn}
               </p>
               <p className="text-[11px] text-neutral-500 truncate">
-                {userEmail}
+                {userAccount ? userAccount.email : 'Google / Microsoft'}
               </p>
             </div>
           </div>
@@ -165,10 +183,13 @@ export const GoogleDrawer: React.FC<GoogleDrawerProps> = ({
             <span>{t.shareNear}</span>
           </button>
 
-          {/* Section Divider */}
-          <hr className="my-2 border-neutral-200/80" />
+          <div className="my-2 border-t border-neutral-100" />
 
-          {/* Collections */}
+          {/* Collections Section */}
+          <div className="px-4 py-1 text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
+            {t.collections}
+          </div>
+
           <button
             onClick={() => {
               onClose();
@@ -176,7 +197,7 @@ export const GoogleDrawer: React.FC<GoogleDrawerProps> = ({
             }}
             className="w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
           >
-            <ShieldCheck size={20} className="text-blue-600" />
+            <ShieldCheck size={20} className="text-emerald-600" />
             <span>{t.safeFolder}</span>
           </button>
 
@@ -191,29 +212,38 @@ export const GoogleDrawer: React.FC<GoogleDrawerProps> = ({
             <span>{t.trash}</span>
           </button>
 
-          {/* Section Divider */}
-          <hr className="my-2 border-neutral-200/80" />
+          <div className="my-2 border-t border-neutral-100" />
 
-          {/* Storage & Devices */}
-          <button
+          {/* Storage Information */}
+          <div 
             onClick={() => {
               onClose();
               onOpenStorageBreakdown();
             }}
-            className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
+            className="p-3 mx-2 bg-neutral-50 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
           >
-            <div className="flex items-center gap-3.5">
-              <HardDrive size={20} className="text-neutral-500" />
-              <span>{t.storageBreakdown}</span>
+            <div className="flex items-center justify-between text-xs font-semibold text-neutral-800 mb-1.5">
+              <div className="flex items-center gap-2">
+                <HardDrive size={16} className="text-blue-600" />
+                <span>{t.storageBreakdown}</span>
+              </div>
+              <span className="text-[11px] text-blue-600 font-bold">
+                {formatBytes(storage.used, 0)} / {formatBytes(storage.total, 0)}
+              </span>
             </div>
-            <span className="text-[11px] text-blue-600 font-semibold">
-              {formatBytes(storage.used, 1)} / {formatBytes(storage.total, 0)}
-            </span>
-          </button>
+            <div className="w-full h-1.5 bg-neutral-200 rounded-full overflow-hidden">
+              <div 
+                style={{ width: `${Math.min(100, Math.round((storage.used / storage.total) * 100))}%` }}
+                className="bg-blue-600 h-full rounded-full"
+              />
+            </div>
+          </div>
 
-          {/* Language Switch */}
+          <div className="my-2 border-t border-neutral-100" />
+
+          {/* Settings and Tools */}
           <button
-            onClick={onToggleLanguage}
+            onClick={() => onToggleLanguage()}
             className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-3.5">
@@ -251,7 +281,7 @@ export const GoogleDrawer: React.FC<GoogleDrawerProps> = ({
                 <span>Google Files v2.4 (Offline)</span>
               </div>
               <p className="text-[11px] text-blue-800 leading-relaxed">
-                Full offline file manager with Storage Cleaning, Internal & SD Card Explorer, MP3 Music Player, Video Player, PDF Reader, and High-Speed Transfers.
+                Full offline file manager with Storage Cleaning, Internal & SD Card Explorer, MP3 Music Player, Video Player, PDF Reader, High-Speed Transfers, and Cloud Account Sync.
               </p>
             </div>
           )}

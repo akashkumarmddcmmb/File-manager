@@ -130,6 +130,7 @@ export const initialFiles: FileItem[] = [
     createdAt: '2026-07-14T10:00:00Z',
     updatedAt: '2026-07-14T10:00:00Z',
     url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    thumbnail: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=60',
     isStarred: true,
   },
   {
@@ -142,6 +143,7 @@ export const initialFiles: FileItem[] = [
     createdAt: '2026-08-30T13:40:00Z',
     updatedAt: '2026-08-30T13:40:00Z',
     url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+    thumbnail: 'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=300&auto=format&fit=crop&q=60',
   },
 
   // Documents
@@ -154,6 +156,7 @@ export const initialFiles: FileItem[] = [
     folder: '/Documents',
     createdAt: '2026-09-02T15:20:00Z',
     updatedAt: '2026-09-02T15:20:00Z',
+    thumbnail: 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=300&auto=format&fit=crop&q=60',
     content: `# Curriculum Vitae\n\n**Candidate:** Full-Stack & Mobile Developer\n**Location:** New Delhi, India\n\n### Summary\nExperienced developer specializing in React, TypeScript, Android and Cloud architectures.\n\n### Skills\n- Frontend: React 19, TypeScript, Tailwind CSS, Material 3\n- Mobile: Android, Files by Google Architecture, Offline Sync\n- Backend: Node.js, Express, SQLite, Cloud APIs\n\n### Projects\n- **Google Files App**: High fidelity file manager with storage cleaner, nearby sharing, category filters, and safe vault.`,
     isStarred: true,
   },
@@ -166,6 +169,7 @@ export const initialFiles: FileItem[] = [
     folder: '/Documents',
     createdAt: '2026-08-25T11:00:00Z',
     updatedAt: '2026-08-25T11:00:00Z',
+    thumbnail: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=300&auto=format&fit=crop&q=60',
     content: `Item | Q1 | Q2 | Q3 (Est.)\n-------------------------\nServer Hosting | $420 | $510 | $490\nDomain & SSL   | $80  | $0   | $0\nMarketing Ads  | $1200| $1500| $1350\nNet Savings    | $4800| $5400| $6100`,
   },
   {
@@ -177,6 +181,7 @@ export const initialFiles: FileItem[] = [
     folder: '/Download',
     createdAt: '2026-09-03T17:00:00Z',
     updatedAt: '2026-09-03T17:00:00Z',
+    thumbnail: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=300&auto=format&fit=crop&q=60',
     content: `Google File Manager Features Checklist:\n1. Clean tab with Junk cache removal\n2. Duplicate file detector\n3. Category view (Downloads, Images, Videos, Audio, Documents, Apps)\n4. Starred collections\n5. Safe Folder protected with 4-digit PIN\n6. Internal Storage folder browser\n7. Multi-select and batch actions\n8. Nearby Share simulator`,
   },
   {
@@ -188,6 +193,7 @@ export const initialFiles: FileItem[] = [
     folder: '/Documents',
     createdAt: '2026-09-03T17:05:00Z',
     updatedAt: '2026-09-03T17:05:00Z',
+    thumbnail: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=300&auto=format&fit=crop&q=60',
     content: `Google File Manager Features Checklist:\n1. Clean tab with Junk cache removal\n2. Duplicate file detector\n3. Category view (Downloads, Images, Videos, Audio, Documents, Apps)\n4. Starred collections\n5. Safe Folder protected with 4-digit PIN\n6. Internal Storage folder browser\n7. Multi-select and batch actions\n8. Nearby Share simulator`,
     isDuplicate: true,
     duplicateGroup: 'dup-notes',
@@ -203,6 +209,7 @@ export const initialFiles: FileItem[] = [
     folder: '/Download',
     createdAt: '2026-08-18T09:30:00Z',
     updatedAt: '2026-08-18T09:30:00Z',
+    thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300&auto=format&fit=crop&q=60',
     isLarge: true,
   },
   {
@@ -214,6 +221,7 @@ export const initialFiles: FileItem[] = [
     folder: '/Download',
     createdAt: '2026-08-05T14:15:00Z',
     updatedAt: '2026-08-05T14:15:00Z',
+    thumbnail: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=300&auto=format&fit=crop&q=60',
     isLarge: true,
   },
 

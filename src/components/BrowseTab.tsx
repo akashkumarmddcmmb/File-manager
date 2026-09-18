@@ -20,6 +20,7 @@ import { formatBytes } from '../utils/storage';
 import { translations } from '../utils/translations';
 import { triggerHapticFeedback, StorageVolumeInfo } from '../utils/nativeStorage';
 import { ShieldAlert, RefreshCw, FolderLock } from 'lucide-react';
+import { FileMediaThumbnail } from './FileMediaThumbnail';
 
 interface BrowseTabProps {
   files: FileItem[];
@@ -178,27 +179,12 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
               >
                 {/* Thumbnail / Preview container */}
                 <div className="w-full h-28 bg-[#f8fafd] flex items-center justify-center overflow-hidden relative">
-                  {file.thumbnail ? (
-                    <img
-                      src={file.thumbnail}
-                      alt={file.name}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-250"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-neutral-400">
-                      {file.type === 'video' && <Film size={32} className="text-[#d93025]" />}
-                      {file.type === 'audio' && <Music size={32} className="text-[#b06000]" />}
-                      {file.type === 'document' && <FileText size={32} className="text-[#185abc]" />}
-                      {file.type === 'apk' && <Package size={32} className="text-[#137333]" />}
-                      {file.type === 'image' && <ImageIcon size={32} className="text-[#00796b]" />}
-                    </div>
-                  )}
-
-                  {/* Format tag badge */}
-                  <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur-xs text-[9px] font-semibold text-white uppercase tracking-wider">
-                    {file.type}
-                  </span>
+                  <FileMediaThumbnail
+                    file={file}
+                    className="w-full h-full"
+                    showBadge={true}
+                    showPlayOverlay={true}
+                  />
                 </div>
 
                 {/* File Title & Size */}

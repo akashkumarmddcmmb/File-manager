@@ -78,3 +78,19 @@ export type TabType = 'clean' | 'browse' | 'share';
 export type ViewMode = 'grid' | 'list';
 export type SortOption = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc' | 'size-desc' | 'size-asc';
 export type Language = 'hi' | 'en';
+
+export interface ClipboardState {
+  operation: 'copy' | 'move';
+  files: FileItem[];
+}
+
+export type AuthProvider = 'google' | 'microsoft';
+
+export interface UserAccount {
+  id: string;
+  name: string;
+  email: string;
+  provider: AuthProvider;
+  avatar?: string;
+  signedInAt?: string;
+}

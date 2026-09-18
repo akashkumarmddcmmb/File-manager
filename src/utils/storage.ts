@@ -1,4 +1,5 @@
 import { FileItem, FolderItem, StorageBreakdown, FileCategory, SortOption } from '../types';
+import { isFileInCategory, classifyFile } from './fileClassifier';
 
 export const TOTAL_STORAGE_BYTES = 64 * 1024 * 1024 * 1024; // 64 GB
 export const SYSTEM_BYTES = 12.4 * 1024 * 1024 * 1024; // 12.4 GB Android OS
@@ -42,24 +43,24 @@ export function computeStorage(
     if (f.isTrash) {
       trash += f.size;
     } else {
-      switch (f.type) {
-        case 'image':
+      const { category } = classifyFile(f.name, f.mimeType);
+      switch (category) {
+        case 'images':
           images += f.size;
           break;
-        case 'video':
+        case 'videos':
           videos += f.size;
           break;
         case 'audio':
           audio += f.size;
           break;
-        case 'document':
-          documents += f.size;
-          break;
-        case 'apk':
+        case 'apps':
           apkSize += f.size;
           break;
+        case 'documents':
         default:
           documents += f.size;
+          break;
       }
     }
   });
@@ -86,28 +87,7 @@ export function computeStorage(
 }
 
 export function filterFilesByCategory(files: FileItem[], category: FileCategory): FileItem[] {
-  switch (category) {
-    case 'downloads':
-      return files.filter(f => !f.isTrash && !f.isSafe && (f.folder.toLowerCase().includes('download')));
-    case 'images':
-      return files.filter(f => !f.isTrash && !f.isSafe && f.type === 'image');
-    case 'videos':
-      return files.filter(f => !f.isTrash && !f.isSafe && f.type === 'video');
-    case 'audio':
-      return files.filter(f => !f.isTrash && !f.isSafe && f.type === 'audio');
-    case 'documents':
-      return files.filter(f => !f.isTrash && !f.isSafe && (f.type === 'document' || f.type === 'archive' || f.type === 'other'));
-    case 'apps':
-      return files.filter(f => !f.isTrash && !f.isSafe && (f.type === 'apk' || f.name.endsWith('.apk')));
-    case 'starred':
-      return files.filter(f => !f.isTrash && !f.isSafe && f.isStarred);
-    case 'safe':
-      return files.filter(f => !f.isTrash && f.isSafe);
-    case 'trash':
-      return files.filter(f => f.isTrash);
-    default:
-      return files.filter(f => !f.isTrash && !f.isSafe);
-  }
+  return files.filter(f => isFileInCategory(f, category));
 }
 
 export function sortFiles(files: FileItem[], sortOption: SortOption): FileItem[] {

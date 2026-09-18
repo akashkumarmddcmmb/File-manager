@@ -6,14 +6,16 @@ import {
   Grid, 
   List, 
   ArrowUpDown, 
-  Upload, 
-  FolderPlus, 
   Languages, 
-  HardDrive 
+  HardDrive,
+  MoreVertical,
+  User,
+  ShieldCheck
 } from 'lucide-react';
-import { ViewMode, SortOption, Language } from '../types';
+import { ViewMode, SortOption, Language, UserAccount } from '../types';
 import { translations } from '../utils/translations';
 import { GoogleFilesLogo } from './GoogleFilesLogo';
+import { GoogleLogoIcon, MicrosoftLogoIcon } from './AccountModal';
 
 interface HeaderProps {
   searchQuery: string;
@@ -29,7 +31,7 @@ interface HeaderProps {
   onOpenStorageBreakdown: () => void;
   onOpenDrawer: () => void;
   onOpenAccount: () => void;
-  userName?: string;
+  userAccount?: UserAccount | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -41,14 +43,13 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectSortOption,
   language,
   onToggleLanguage,
-  onUploadClick,
-  onNewFolderClick,
   onOpenStorageBreakdown,
   onOpenDrawer,
   onOpenAccount,
-  userName = 'Akash Kumar',
+  userAccount,
 }) => {
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const t = translations[language];
 
   return (
@@ -109,7 +110,10 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="relative">
               <button
                 id="btn-sort-toggle"
-                onClick={() => setShowSortMenu(!showSortMenu)}
+                onClick={() => {
+                  setShowSortMenu(!showSortMenu);
+                  setShowMoreMenu(false);
+                }}
                 title="Sort options"
                 className="p-1.5 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors cursor-pointer"
               >
@@ -191,15 +195,119 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="text-[11px] hidden sm:inline">{language === 'en' ? 'HI' : 'EN'}</span>
             </button>
 
-            {/* Google Account Profile Avatar Bubble */}
-            <button
-              id="btn-google-account-avatar"
-              onClick={onOpenAccount}
-              title="Google Account"
-              className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center font-bold text-xs shadow-xs ring-2 ring-white hover:ring-blue-200 transition-all cursor-pointer shrink-0 ml-0.5"
-            >
-              {userName.charAt(0)}
-            </button>
+            {/* Three Dots More Menu (Account section relocated inside here) */}
+            <div className="relative">
+              <button
+                id="btn-three-dots-menu"
+                onClick={() => {
+                  setShowMoreMenu(!showMoreMenu);
+                  setShowSortMenu(false);
+                }}
+                title={t.moreOptions}
+                className="p-1.5 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors cursor-pointer shrink-0 ml-0.5"
+              >
+                <MoreVertical size={19} />
+              </button>
+
+              {/* Three Dots Overflow Menu */}
+              {showMoreMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowMoreMenu(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-neutral-200/90 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                    {/* Account Section inside Three Dots */}
+                    <div className="px-2.5 pb-2">
+                      <div className="px-1 pb-1.5 text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+                        {t.account}
+                      </div>
+
+                      {userAccount ? (
+                        <button
+                          id="btn-three-dots-account"
+                          onClick={() => {
+                            setShowMoreMenu(false);
+                            onOpenAccount();
+                          }}
+                          className="w-full p-2.5 bg-neutral-50 hover:bg-blue-50/70 rounded-xl transition-colors flex items-center gap-2.5 text-left group cursor-pointer border border-neutral-200/80"
+                        >
+                          <div className="relative shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                              {userAccount.name ? userAccount.name.charAt(0).toUpperCase() : 'U'}
+                            </div>
+                            <div className="absolute -bottom-0.5 -right-0.5 bg-white p-0.5 rounded-full shadow-xs border border-neutral-200">
+                              {userAccount.provider === 'google' ? (
+                                <GoogleLogoIcon size={10} />
+                              ) : (
+                                <MicrosoftLogoIcon size={10} />
+                              )}
+                            </div>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-neutral-900 group-hover:text-blue-600 truncate">
+                              {userAccount.name}
+                            </p>
+                            <p className="text-[11px] text-neutral-500 truncate">
+                              {userAccount.email}
+                            </p>
+                          </div>
+                        </button>
+                      ) : (
+                        <button
+                          id="btn-three-dots-sign-in"
+                          onClick={() => {
+                            setShowMoreMenu(false);
+                            onOpenAccount();
+                          }}
+                          className="w-full p-2.5 bg-blue-50/70 hover:bg-blue-100/70 rounded-xl transition-colors flex items-center gap-2.5 text-left group cursor-pointer border border-blue-200/80"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                            <User size={16} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-blue-700 group-hover:text-blue-800">
+                              {t.signIn}
+                            </p>
+                            <p className="text-[11px] text-blue-600/80 truncate">
+                              Google / Microsoft
+                            </p>
+                          </div>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="my-1 border-t border-neutral-100" />
+
+                    {/* Storage Breakdown */}
+                    <button
+                      id="btn-three-dots-storage"
+                      onClick={() => {
+                        setShowMoreMenu(false);
+                        onOpenStorageBreakdown();
+                      }}
+                      className="w-full text-left px-3.5 py-2 text-xs text-neutral-700 hover:bg-neutral-50 transition-colors flex items-center gap-2.5 cursor-pointer"
+                    >
+                      <HardDrive size={16} className="text-neutral-500" />
+                      <span>{t.storageBreakdown}</span>
+                    </button>
+
+                    {/* Language Switch */}
+                    <button
+                      id="btn-three-dots-lang"
+                      onClick={() => {
+                        setShowMoreMenu(false);
+                        onToggleLanguage();
+                      }}
+                      className="w-full text-left px-3.5 py-2 text-xs text-neutral-700 hover:bg-neutral-50 transition-colors flex items-center gap-2.5 cursor-pointer"
+                    >
+                      <Languages size={16} className="text-purple-600" />
+                      <span>{language === 'en' ? 'हिंदी (Hindi)' : 'English'}</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
