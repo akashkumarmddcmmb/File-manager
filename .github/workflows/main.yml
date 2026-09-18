@@ -82,7 +82,7 @@ jobs:
       - name: Install Dependencies
         shell: bash
         run: |
-          bun install --frozen-lockfile
+          bun install --no-frozen-lockfile
 
 
       # --------------------------------------------------
