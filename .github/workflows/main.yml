@@ -1,4 +1,4 @@
-name: Build Android APK
+name: build-apk
 
 on:
   workflow_dispatch:
@@ -42,17 +42,34 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
+      - name: Check Java and Gradle
+        working-directory: android
+        run: |
+          java -version
+          ./gradlew --version
+
+      - name: Clean Gradle
+        working-directory: android
+        run: ./gradlew clean --stacktrace
+
       - name: Build Debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug --stacktrace --info
+
+      - name: Find APK
+        if: success()
+        run: |
+          find android/app/build/outputs -type f -name "*.apk" -print
 
       - name: Rename APK
+        if: success()
         run: |
           mkdir -p release
           cp android/app/build/outputs/apk/debug/app-debug.apk \
-             release/Files-Google-File-Manager-debug.apk
+            release/Files-Google-File-Manager-debug.apk
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Files-Google-File-Manager-debug
