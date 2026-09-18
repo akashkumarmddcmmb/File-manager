@@ -1,4 +1,4 @@
-name: Android APK Build
+name: Build APK
 
 on:
   workflow_dispatch:
@@ -7,230 +7,160 @@ on:
       - main
       - master
 
+permissions:
+  contents: read
+
 jobs:
   build:
-    name: Build Debug APK
+    name: Build Android Debug APK
     runs-on: ubuntu-latest
 
     steps:
 
-      # --------------------------------------------------
       # 1. Checkout
-      # --------------------------------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
 
-      # --------------------------------------------------
-      # 2. JDK 17
-      # --------------------------------------------------
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      # 2. Setup Node.js
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+
+      # 3. Setup Bun
+      # Project contains bun.lock
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "latest"
+
+
+      # 4. Setup Java 21
+      - name: Setup JDK 21
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "21"
+          cache: gradle
 
 
-      # --------------------------------------------------
-      # 3. Install Gradle
-      # --------------------------------------------------
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.11'
-
-
-      # --------------------------------------------------
-      # 4. Find Android/Gradle project
-      # --------------------------------------------------
-      - name: Find Gradle project
-        shell: bash
+      # 5. Show versions
+      - name: Check versions
         run: |
-
-          echo "======================================"
-          echo "Searching for Gradle project..."
-          echo "======================================"
-
-          echo "Current directory:"
-          pwd
-
-          echo ""
-          echo "Repository contents:"
-          ls -la
-
-          echo ""
-          echo "Searching settings.gradle files..."
-
-          SETTINGS_FILE=$(find . \
-            -type f \
-            \( -name "settings.gradle" -o -name "settings.gradle.kts" \) \
-            -not -path "*/.gradle/*" \
-            | head -n 1)
-
-          if [ -z "$SETTINGS_FILE" ]; then
-            echo ""
-            echo "ERROR: settings.gradle or settings.gradle.kts was not found."
-            echo ""
-            echo "All Gradle related files:"
-            find . -type f \
-              \( -name "build.gradle" -o -name "build.gradle.kts" \
-              -o -name "settings.gradle" -o -name "settings.gradle.kts" \) \
-              -print
-
-            exit 1
-          fi
-
-          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
-          PROJECT_DIR=$(cd "$PROJECT_DIR" && pwd)
-
-          echo ""
-          echo "Gradle project found:"
-          echo "$PROJECT_DIR"
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-          echo ""
-          echo "Project files:"
-          ls -la "$PROJECT_DIR"
+          node --version
+          bun --version
+          java -version
 
 
-      # --------------------------------------------------
-      # 5. Check Gradle project
-      # --------------------------------------------------
-      - name: Check Gradle project
-        shell: bash
+      # 6. Install exact locked dependencies
+      - name: Install dependencies
         run: |
-
-          echo "======================================"
-          echo "Gradle Project"
-          echo "======================================"
-
-          cd "$PROJECT_DIR"
-
-          echo "Working directory:"
-          pwd
-
-          echo ""
-          echo "Files:"
-          ls -la
-
-          echo ""
-          echo "Modules:"
-          find . -maxdepth 2 -type d -print
+          bun install --frozen-lockfile
 
 
-      # --------------------------------------------------
-      # 6. Create Gradle Wrapper if missing
-      # --------------------------------------------------
-      - name: Create Gradle Wrapper
-        shell: bash
+      # 7. Build web application
+      - name: Build web
         run: |
-
-          cd "$PROJECT_DIR"
-
-          echo "======================================"
-          echo "Checking Gradle Wrapper"
-          echo "======================================"
-
-          if [ -f "./gradlew" ]; then
-
-            echo "gradlew already exists."
-
-          else
-
-            echo "gradlew is missing."
-            echo "Creating Gradle Wrapper..."
-
-            gradle wrapper --gradle-version 8.11
-
-          fi
+          bun run build
 
 
-      # --------------------------------------------------
-      # 7. Make wrapper executable
-      # --------------------------------------------------
-      - name: Make Gradle Wrapper executable
-        shell: bash
+      # 8. Sync Capacitor
+      # This regenerates Capacitor Android Gradle files if required.
+      - name: Capacitor Sync
         run: |
-
-          cd "$PROJECT_DIR"
-
-          chmod +x ./gradlew
-
-          echo "Gradle Wrapper:"
-          ls -l ./gradlew
+          bunx cap sync android
 
 
-      # --------------------------------------------------
-      # 8. Show Gradle version
-      # --------------------------------------------------
-      - name: Check Gradle version
-        shell: bash
+      # 9. Verify Android project
+      - name: Verify Android project
+        working-directory: android
         run: |
+          set -e
 
-          cd "$PROJECT_DIR"
+          echo "Checking Android project..."
 
+          test -f settings.gradle
+          test -f build.gradle
+          test -f app/build.gradle
+          test -f gradlew
+          test -f gradle/wrapper/gradle-wrapper.jar
+          test -f gradle/wrapper/gradle-wrapper.properties
+
+          echo "Checking Capacitor Gradle files..."
+
+          test -f capacitor.settings.gradle
+          test -f capacitor.build.gradle
+
+          chmod +x gradlew
+
+          echo "Android project verification successful."
+
+
+      # 10. Check Gradle
+      - name: Check Gradle
+        working-directory: android
+        run: |
           ./gradlew --version
 
 
-      # --------------------------------------------------
-      # 9. Clean
-      # --------------------------------------------------
-      - name: Clean project
-        shell: bash
+      # 11. Check Gradle modules
+      - name: Check Gradle modules
+        working-directory: android
         run: |
+          ./gradlew projects \
+            --no-daemon \
+            --stacktrace
 
-          cd "$PROJECT_DIR"
 
+      # 12. Clean
+      - name: Clean
+        working-directory: android
+        run: |
           ./gradlew clean \
-            --stacktrace \
-            --no-daemon
+            --no-daemon \
+            --stacktrace
 
 
-      # --------------------------------------------------
-      # 10. Build Debug APK
-      # --------------------------------------------------
+      # 13. Build Debug APK
       - name: Build Debug APK
-        shell: bash
+        working-directory: android
         run: |
-
-          cd "$PROJECT_DIR"
-
-          echo "======================================"
-          echo "Building Debug APK"
-          echo "======================================"
-
-          ./gradlew assembleDebug \
-            --stacktrace \
-            --no-daemon
+          ./gradlew :app:assembleDebug \
+            --no-daemon \
+            --stacktrace
 
 
-      # --------------------------------------------------
-      # 11. Find APK
-      # --------------------------------------------------
-      - name: Find APK
-        shell: bash
+      # 14. Verify APK
+      - name: Verify APK
         run: |
+          set -e
 
-          cd "$PROJECT_DIR"
+          echo "Generated APK files:"
 
-          echo "======================================"
-          echo "Searching for APK..."
-          echo "======================================"
-
-          find . \
+          find android/app/build/outputs/apk \
             -type f \
             -name "*.apk" \
             -print
 
+          APK_COUNT=$(find android/app/build/outputs/apk \
+            -type f \
+            -name "*.apk" | wc -l)
 
-      # --------------------------------------------------
-      # 12. Upload APK
-      # --------------------------------------------------
+          if [ "$APK_COUNT" -eq 0 ]; then
+            echo "ERROR: APK was not generated."
+            exit 1
+          fi
+
+          echo "APK generated successfully."
+
+
+      # 15. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
-          path: |
-            **/build/outputs/apk/debug/*.apk
+          name: Files-Debug-APK
+          path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+          retention-days: 14
