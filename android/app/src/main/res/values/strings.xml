@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Files</string>
+    <string name="title_activity_main">Files</string>
+    <string name="package_name">com.google.android.apps.nbu.files.clone</string>
+    <string name="custom_url_scheme">com.google.android.apps.nbu.files.clone</string>
+</resources>
