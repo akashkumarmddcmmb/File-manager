@@ -1,4 +1,4 @@
-name: Build APK
+name: Build Android Debug APK
 
 on:
   workflow_dispatch:
@@ -17,27 +17,22 @@ jobs:
 
     steps:
 
-      # 1. Checkout
       - name: Checkout
         uses: actions/checkout@v4
 
 
-      # 2. Setup Node.js
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
 
-      # 3. Setup Bun
-      # Project contains bun.lock
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: "latest"
 
 
-      # 4. Setup Java 21
       - name: Setup JDK 21
         uses: actions/setup-java@v5
         with:
@@ -46,7 +41,6 @@ jobs:
           cache: gradle
 
 
-      # 5. Show versions
       - name: Check versions
         run: |
           node --version
@@ -54,28 +48,24 @@ jobs:
           java -version
 
 
-      # 6. Install exact locked dependencies
       - name: Install dependencies
         run: |
           bun install --frozen-lockfile
 
 
-      # 7. Build web application
-      - name: Build web
+      - name: Build web application
         run: |
           bun run build
 
 
-      # 8. Sync Capacitor
-      # This regenerates Capacitor Android Gradle files if required.
       - name: Capacitor Sync
         run: |
           bunx cap sync android
 
 
-      # 9. Verify Android project
       - name: Verify Android project
         working-directory: android
+        shell: bash
         run: |
           set -e
 
@@ -84,28 +74,24 @@ jobs:
           test -f settings.gradle
           test -f build.gradle
           test -f app/build.gradle
+          test -f app/capacitor.build.gradle
+          test -f capacitor.settings.gradle
+
           test -f gradlew
           test -f gradle/wrapper/gradle-wrapper.jar
           test -f gradle/wrapper/gradle-wrapper.properties
 
-          echo "Checking Capacitor Gradle files..."
-
-          test -f capacitor.settings.gradle
-          test -f capacitor.build.gradle
-
           chmod +x gradlew
 
-          echo "Android project verification successful."
+          echo "Android project verified successfully."
 
 
-      # 10. Check Gradle
       - name: Check Gradle
         working-directory: android
         run: |
           ./gradlew --version
 
 
-      # 11. Check Gradle modules
       - name: Check Gradle modules
         working-directory: android
         run: |
@@ -114,7 +100,6 @@ jobs:
             --stacktrace
 
 
-      # 12. Clean
       - name: Clean
         working-directory: android
         run: |
@@ -123,7 +108,6 @@ jobs:
             --stacktrace
 
 
-      # 13. Build Debug APK
       - name: Build Debug APK
         working-directory: android
         run: |
@@ -132,12 +116,12 @@ jobs:
             --stacktrace
 
 
-      # 14. Verify APK
       - name: Verify APK
+        shell: bash
         run: |
           set -e
 
-          echo "Generated APK files:"
+          echo "Searching for APK..."
 
           find android/app/build/outputs/apk \
             -type f \
@@ -156,7 +140,6 @@ jobs:
           echo "APK generated successfully."
 
 
-      # 15. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
