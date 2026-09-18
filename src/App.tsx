@@ -20,6 +20,10 @@ import { ShareTab } from './components/ShareTab';
 import { CategoryDetailView } from './components/CategoryDetailView';
 import { FolderView } from './components/FolderView';
 import { FileViewerModal } from './components/FileViewerModal';
+import { AudioPlayerModal } from './components/AudioPlayerModal';
+import { MiniMusicPlayer } from './components/MiniMusicPlayer';
+import { VideoPlayerModal } from './components/VideoPlayerModal';
+import { PdfDocumentViewerModal } from './components/PdfDocumentViewerModal';
 import { SafeFolderModal } from './components/SafeFolderModal';
 import { TrashModal } from './components/TrashModal';
 import { StorageBreakdownModal } from './components/StorageBreakdownModal';
@@ -31,7 +35,15 @@ import { AccountModal } from './components/AccountModal';
 import { FileItemCard } from './components/FileItemCard';
 import { translations } from './utils/translations';
 import { UploadCloud, CheckCircle2 } from 'lucide-react';
-import { scanNativeStorage, isNativePlatform } from './utils/nativeStorage';
+import { Capacitor } from '@capacitor/core';
+import { 
+  scanNativeStorage, 
+  isNativePlatform, 
+  checkStoragePermissionStatus, 
+  requestAllFilesAccess, 
+  StorageVolumeInfo,
+  openRealFile
+} from './utils/nativeStorage';
 
 const STORAGE_FILES_KEY = 'google_files_app_files_v1';
 const STORAGE_FOLDERS_KEY = 'google_files_app_folders_v1';
@@ -94,25 +106,100 @@ export default function App() {
     }
   }, [junkBytes]);
 
-  // Check and read real device storage when running natively on Android
-  useEffect(() => {
-    async function loadRealDeviceStorage() {
+  // Preferences & Toast
+  const [language, setLanguage] = useState<Language>('hi');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Real device native storage state
+  const [isNative, setIsNative] = useState(false);
+  const [permStatus, setPermStatus] = useState<{ granted: boolean; needsManageSettings: boolean }>({
+    granted: true,
+    needsManageSettings: false,
+  });
+  const [realVolumes, setRealVolumes] = useState<{
+    internal: StorageVolumeInfo | null;
+    sdcard: StorageVolumeInfo | null;
+  } | null>(null);
+  const [isScanningStorage, setIsScanningStorage] = useState(false);
+
+  const loadRealDeviceStorage = async (showFeedback = false) => {
+    try {
       const native = await isNativePlatform();
-      if (native) {
+      setIsNative(native);
+      if (!native) return;
+
+      const perm = await checkStoragePermissionStatus();
+      setPermStatus(perm);
+
+      if (perm.granted) {
+        setIsScanningStorage(true);
         const result = await scanNativeStorage();
-        if (result && result.files.length > 0) {
-          setFiles(prev => {
-            // merge unique real files
-            const existingIds = new Set(prev.map(f => f.name));
-            const newFiles = result.files.filter(f => !existingIds.has(f.name));
-            return [...newFiles, ...prev];
-          });
-          setFolders(result.folders);
+        setIsScanningStorage(false);
+
+        if (result) {
+          if (result.volumes) {
+            setRealVolumes(result.volumes);
+          }
+          if (result.files && result.files.length > 0) {
+            setFiles(prev => {
+              const existingKeys = new Set(prev.map(f => f.url || f.name));
+              const newFiles = result.files.filter(f => !existingKeys.has(f.url || f.name));
+              return [...newFiles, ...prev];
+            });
+          }
+          if (result.folders && result.folders.length > 0) {
+            setFolders(result.folders);
+          }
+          if (showFeedback) {
+            showToast(
+              language === 'hi'
+                ? `डिवाइस रिफ्रेश सफल: ${result.files.length} फाइलें मिलीं`
+                : `Device refreshed: ${result.files.length} files found`
+            );
+          }
         }
       }
+    } catch (err) {
+      console.error('Error loading real device storage:', err);
+      setIsScanningStorage(false);
     }
+  };
+
+  // Check and read real device storage when running natively on Android
+  useEffect(() => {
     loadRealDeviceStorage();
-  }, []);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadRealDeviceStorage();
+      }
+    };
+    const handleFocus = () => {
+      loadRealDeviceStorage();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [language]);
+
+  const handleRequestStoragePermission = async () => {
+    await requestAllFilesAccess();
+    showToast(
+      language === 'hi' 
+        ? 'कृपया All files access स्विच को ऑन (ON) करें' 
+        : 'Please enable the All files access toggle in Settings'
+    );
+  };
 
   // 2. Navigation & View State
   const [activeTab, setActiveTab] = useState<TabType>('browse');
@@ -131,6 +218,86 @@ export default function App() {
   const [renameTarget, setRenameTarget] = useState<FileItem | null>(null);
   const [newFolderParentPath, setNewFolderParentPath] = useState<string | null>(null);
 
+  // Dedicated Media Player States (Audio, Video, PDF Reader)
+  const [currentAudio, setCurrentAudio] = useState<FileItem | null>(null);
+  const [audioPlaylist, setAudioPlaylist] = useState<FileItem[]>([]);
+  const [isAudioPlayerOpen, setIsAudioPlayerOpen] = useState(false);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [isShuffle, setIsShuffle] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('all');
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+
+  const [videoPlayerFile, setVideoPlayerFile] = useState<FileItem | null>(null);
+  const [pdfViewerFile, setPdfViewerFile] = useState<FileItem | null>(null);
+
+  // Sync background HTML audio element with currentAudio
+  useEffect(() => {
+    if (!audioElementRef.current) return;
+    if (currentAudio) {
+      const src = currentAudio.url && currentAudio.url.startsWith('/')
+        ? Capacitor.convertFileSrc(currentAudio.url)
+        : currentAudio.url;
+      if (src) {
+        audioElementRef.current.src = src;
+        if (isAudioPlaying) {
+          audioElementRef.current.play().catch(e => console.warn('Audio play error:', e));
+        }
+      }
+    } else {
+      audioElementRef.current.pause();
+      audioElementRef.current.src = '';
+    }
+  }, [currentAudio]);
+
+  useEffect(() => {
+    if (!audioElementRef.current || !currentAudio) return;
+    if (isAudioPlaying) {
+      audioElementRef.current.play().catch(e => console.warn('Audio play error:', e));
+    } else {
+      audioElementRef.current.pause();
+    }
+  }, [isAudioPlaying]);
+
+  const handleNextTrack = () => {
+    if (!currentAudio || audioPlaylist.length === 0) return;
+    let nextIndex = 0;
+    if (isShuffle) {
+      nextIndex = Math.floor(Math.random() * audioPlaylist.length);
+    } else {
+      const currentIndex = audioPlaylist.findIndex(t => t.id === currentAudio.id);
+      nextIndex = (currentIndex + 1) % audioPlaylist.length;
+    }
+    setCurrentAudio(audioPlaylist[nextIndex]);
+    setIsAudioPlaying(true);
+  };
+
+  const handlePrevTrack = () => {
+    if (!currentAudio || audioPlaylist.length === 0) return;
+    const currentIndex = audioPlaylist.findIndex(t => t.id === currentAudio.id);
+    const prevIndex = (currentIndex - 1 + audioPlaylist.length) % audioPlaylist.length;
+    setCurrentAudio(audioPlaylist[prevIndex]);
+    setIsAudioPlaying(true);
+  };
+
+  const handleOpenPreview = (file: FileItem) => {
+    if (file.type === 'audio') {
+      const audios = files.filter(f => f.type === 'audio' && !f.isTrash && !f.isSafe);
+      const playlist = audios.some(a => a.id === file.id) ? audios : [file, ...audios];
+      setAudioPlaylist(playlist);
+      setCurrentAudio(file);
+      setIsAudioPlayerOpen(true);
+      setIsAudioPlaying(true);
+    } else if (file.type === 'video') {
+      setVideoPlayerFile(file);
+    } else if (file.type === 'document') {
+      setPdfViewerFile(file);
+    } else {
+      setPreviewFile(file);
+    }
+  };
+
   // 4. Copy/Move & Transfer Simulation State
   const [copyMoveModal, setCopyMoveModal] = useState<{
     isOpen: boolean;
@@ -148,8 +315,6 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortOption, setSortOption] = useState<SortOption>('date-desc');
-  const [language, setLanguage] = useState<Language>('hi');
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
   // Hidden file input for real uploads
@@ -158,13 +323,13 @@ export default function App() {
 
   const t = translations[language];
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
-
-  // Computed storage breakdown
-  const storage = computeStorage(files, junkBytes);
+  // Computed storage breakdown with real device storage metrics if available
+  const storage = computeStorage(
+    files, 
+    junkBytes, 
+    realVolumes?.internal?.totalBytes, 
+    realVolumes?.internal?.usedBytes
+  );
 
   // Real File Upload Handler (via Drag and Drop or File Picker)
   const handleUploadFiles = (fileList: FileList, targetFolder = '/Download') => {
@@ -649,7 +814,7 @@ export default function App() {
                     viewMode={viewMode}
                     isSelected={false}
                     onToggleSelect={() => {}}
-                    onOpenPreview={setPreviewFile}
+                    onOpenPreview={handleOpenPreview}
                     onToggleStar={handleToggleStar}
                     onMoveToTrash={handleMoveToTrash}
                     onMoveToSafe={handleMoveToSafe}
@@ -675,16 +840,27 @@ export default function App() {
             currentDevice={activeStorageDevice}
             onNavigatePath={setCurrentFolderPath}
             onBack={() => {
-              if (currentFolderPath === '/') {
+              const rootPath = activeStorageDevice === 'sdcard' && realVolumes?.sdcard?.path
+                ? realVolumes.sdcard.path
+                : (realVolumes?.internal?.path || '/');
+              if (
+                currentFolderPath === '/' || 
+                currentFolderPath === rootPath || 
+                currentFolderPath === '/storage/emulated/0'
+              ) {
                 setIsFolderViewOpen(false);
               } else {
-                const parent = currentFolderPath.substring(0, currentFolderPath.lastIndexOf('/')) || '/';
-                setCurrentFolderPath(parent);
+                const parent = currentFolderPath.substring(0, currentFolderPath.lastIndexOf('/')) || rootPath;
+                if (parent.length < rootPath.length) {
+                  setIsFolderViewOpen(false);
+                } else {
+                  setCurrentFolderPath(parent);
+                }
               }
             }}
             onCreateFolder={(p) => setNewFolderParentPath(p)}
             onUploadToFolder={(p) => triggerUpload(p)}
-            onOpenPreview={setPreviewFile}
+            onOpenPreview={handleOpenPreview}
             onToggleStar={handleToggleStar}
             onMoveToTrash={handleMoveToTrash}
             onMoveToSafe={handleMoveToSafe}
@@ -705,7 +881,7 @@ export default function App() {
             sortOption={sortOption}
             language={language}
             onBack={() => setSelectedCategory(null)}
-            onOpenPreview={setPreviewFile}
+            onOpenPreview={handleOpenPreview}
             onToggleStar={handleToggleStar}
             onMoveToTrash={handleMoveToTrash}
             onMoveToSafe={handleMoveToSafe}
@@ -741,15 +917,23 @@ export default function App() {
                 viewMode={viewMode}
                 sortOption={sortOption}
                 language={language}
+                realVolumes={realVolumes}
+                permStatus={permStatus}
+                isScanningStorage={isScanningStorage}
+                onRequestPermissions={handleRequestStoragePermission}
+                onRefreshStorage={() => loadRealDeviceStorage(true)}
                 onSelectCategory={setSelectedCategory}
                 onOpenFolderView={(device = 'internal') => {
                   setActiveStorageDevice(device);
-                  setCurrentFolderPath('/');
+                  const rootPath = device === 'sdcard' && realVolumes?.sdcard?.path
+                    ? realVolumes.sdcard.path
+                    : (device === 'internal' && realVolumes?.internal?.path ? realVolumes.internal.path : '/');
+                  setCurrentFolderPath(rootPath);
                   setIsFolderViewOpen(true);
                 }}
                 onOpenSafeFolder={() => setIsSafeFolderOpen(true)}
                 onOpenTrash={() => setIsTrashOpen(true)}
-                onOpenPreview={setPreviewFile}
+                onOpenPreview={handleOpenPreview}
                 onToggleStar={handleToggleStar}
                 onMoveToTrash={handleMoveToTrash}
                 onMoveToSafe={handleMoveToSafe}
@@ -795,7 +979,7 @@ export default function App() {
         language={language}
         onClose={() => setIsSafeFolderOpen(false)}
         onRemoveFromSafe={handleRemoveFromSafe}
-        onOpenPreview={setPreviewFile}
+        onOpenPreview={handleOpenPreview}
         onMoveToTrash={handleMoveToTrash}
       />
 
@@ -891,6 +1075,99 @@ export default function App() {
           setIsAccountOpen(false);
           setIsStorageBreakdownOpen(true);
         }}
+      />
+
+      {/* Hidden Global Audio Element for Background Music Playback */}
+      <audio
+        ref={audioElementRef}
+        onTimeUpdate={() => {
+          if (audioElementRef.current) {
+            setAudioCurrentTime(audioElementRef.current.currentTime);
+          }
+        }}
+        onLoadedMetadata={() => {
+          if (audioElementRef.current) {
+            setAudioDuration(audioElementRef.current.duration);
+          }
+        }}
+        onEnded={() => {
+          if (repeatMode === 'one') {
+            if (audioElementRef.current) {
+              audioElementRef.current.currentTime = 0;
+              audioElementRef.current.play().catch(() => {});
+            }
+          } else {
+            handleNextTrack();
+          }
+        }}
+      />
+
+      {/* Floating Mini Music Player (Persistent while browsing other files/folders) */}
+      {currentAudio && !isAudioPlayerOpen && (
+        <MiniMusicPlayer
+          file={currentAudio}
+          isPlaying={isAudioPlaying}
+          currentTime={audioCurrentTime}
+          duration={audioDuration}
+          onExpand={() => setIsAudioPlayerOpen(true)}
+          onPlayPause={() => setIsAudioPlaying(!isAudioPlaying)}
+          onNext={handleNextTrack}
+          onClose={() => {
+            setIsAudioPlaying(false);
+            setCurrentAudio(null);
+          }}
+        />
+      )}
+
+      {/* Full Dedicated Music Player Modal with Visualizer & Playlist */}
+      <AudioPlayerModal
+        isOpen={isAudioPlayerOpen}
+        file={currentAudio}
+        playlist={audioPlaylist}
+        isPlaying={isAudioPlaying}
+        currentTime={audioCurrentTime}
+        duration={audioDuration}
+        isShuffle={isShuffle}
+        repeatMode={repeatMode}
+        language={language}
+        onClose={() => setIsAudioPlayerOpen(false)}
+        onMinimize={() => setIsAudioPlayerOpen(false)}
+        onPlayPause={() => setIsAudioPlaying(!isAudioPlaying)}
+        onSeek={(secs) => {
+          if (audioElementRef.current) {
+            audioElementRef.current.currentTime = secs;
+            setAudioCurrentTime(secs);
+          }
+        }}
+        onNext={handleNextTrack}
+        onPrev={handlePrevTrack}
+        onToggleShuffle={() => setIsShuffle(!isShuffle)}
+        onToggleRepeat={() => {
+          setRepeatMode(prev => prev === 'off' ? 'all' : prev === 'all' ? 'one' : 'off');
+        }}
+        onSelectTrack={(track) => {
+          setCurrentAudio(track);
+          setIsAudioPlaying(true);
+        }}
+        onToggleStar={handleToggleStar}
+      />
+
+      {/* Full Dedicated Mobile Video Player Modal */}
+      <VideoPlayerModal
+        isOpen={videoPlayerFile !== null}
+        file={videoPlayerFile}
+        language={language}
+        onClose={() => setVideoPlayerFile(null)}
+        onToggleStar={handleToggleStar}
+      />
+
+      {/* Full Dedicated PDF & Document Reader Modal */}
+      <PdfDocumentViewerModal
+        isOpen={pdfViewerFile !== null}
+        file={pdfViewerFile}
+        language={language}
+        onClose={() => setPdfViewerFile(null)}
+        onToggleStar={handleToggleStar}
       />
     </div>
   );

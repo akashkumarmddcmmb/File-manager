@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { 
   X, 
   Star, 
@@ -12,11 +13,14 @@ import {
   File, 
   Share2,
   Maximize2,
-  Folder
+  Folder,
+  Play,
+  ExternalLink
 } from 'lucide-react';
 import { FileItem, Language } from '../types';
 import { formatBytes, formatDate } from '../utils/storage';
 import { translations } from '../utils/translations';
+import { openRealFile, shareNativeFile } from '../utils/nativeStorage';
 
 interface FileViewerModalProps {
   file: FileItem | null;
@@ -86,6 +90,13 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
           {/* Action icons */}
           <div className="flex items-center gap-1.5 shrink-0">
             <button
+              onClick={() => file.url && shareNativeFile(file.name, `Sharing ${file.name} (${formatBytes(file.size)})`, file.url)}
+              className="p-2 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-full transition-colors"
+              title="Share"
+            >
+              <Share2 size={19} />
+            </button>
+            <button
               onClick={() => onToggleStar(file.id)}
               className="p-2 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-full transition-colors"
               title={file.isStarred ? 'Unstar' : 'Star'}
@@ -125,25 +136,41 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
         <div className="flex-1 overflow-y-auto relative bg-neutral-950 flex flex-col items-center justify-center p-4 min-h-[340px]">
           {/* 1. Image Viewer */}
           {file.type === 'image' && (
-            <div className="w-full h-full flex items-center justify-center">
+            <div className="w-full h-full flex flex-col items-center justify-center gap-3">
               <img
-                src={file.url || file.thumbnail}
+                src={file.url && file.url.startsWith('/') ? Capacitor.convertFileSrc(file.url) : (file.url || file.thumbnail)}
                 alt={file.name}
                 referrerPolicy="no-referrer"
                 className="max-h-[60vh] max-w-full object-contain rounded-lg shadow-md"
               />
+              {file.url && file.url.startsWith('/') && (
+                <button
+                  onClick={() => openRealFile(file.url!)}
+                  className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-full text-xs font-medium flex items-center gap-2 transition-colors"
+                >
+                  <ExternalLink size={14} /> Open in Gallery / गैलरी में खोलें
+                </button>
+              )}
             </div>
           )}
 
           {/* 2. Video Player */}
           {file.type === 'video' && (
-            <div className="w-full flex items-center justify-center">
+            <div className="w-full flex flex-col items-center justify-center gap-3">
               <video
-                src={file.url}
+                src={file.url && file.url.startsWith('/') ? Capacitor.convertFileSrc(file.url) : file.url}
                 controls
                 autoPlay
-                className="max-h-[60vh] max-w-full rounded-lg shadow-lg border border-neutral-800 bg-black"
+                className="max-h-[55vh] max-w-full rounded-lg shadow-lg border border-neutral-800 bg-black"
               />
+              {file.url && (
+                <button
+                  onClick={() => openRealFile(file.url!)}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-full text-xs flex items-center gap-2 shadow-sm transition-colors"
+                >
+                  <Film size={15} /> Play in Video Player / वीडियो प्लेयर में चलाएं
+                </button>
+              )}
             </div>
           )}
 
@@ -154,10 +181,23 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
                 <Music size={40} />
               </div>
               <div>
-                <h3 className="text-base font-semibold truncate">{file.name}</h3>
-                <p className="text-xs text-neutral-400 mt-1">{formatBytes(file.size)}</p>
+                <h3 className="text-base font-semibold truncate text-white">{file.name}</h3>
+                <p className="text-xs text-neutral-400 mt-1">{formatBytes(file.size)} • {file.folder}</p>
               </div>
-              <audio src={file.url} controls autoPlay className="w-full" />
+              <audio 
+                src={file.url && file.url.startsWith('/') ? Capacitor.convertFileSrc(file.url) : file.url} 
+                controls 
+                autoPlay 
+                className="w-full" 
+              />
+              {file.url && (
+                <button
+                  onClick={() => openRealFile(file.url!)}
+                  className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-neutral-950 font-semibold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-colors"
+                >
+                  <Play size={16} className="fill-neutral-950" /> Play in Phone Music Player / फ़ोन प्लेयर में बजाएं
+                </button>
+              )}
             </div>
           )}
 
@@ -165,18 +205,28 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
           {file.type === 'document' && (
             <div className="w-full max-w-2xl bg-neutral-900 p-5 rounded-2xl border border-neutral-800 text-neutral-200 text-xs sm:text-sm font-mono whitespace-pre-wrap max-h-[55vh] overflow-y-auto leading-relaxed">
               {file.content || (
-                <div className="text-center py-10 text-neutral-400 font-sans">
+                <div className="text-center py-10 text-neutral-400 font-sans space-y-3">
                   <FileText size={48} className="mx-auto mb-2 text-emerald-400 opacity-80" />
-                  <p className="font-semibold text-neutral-300">Document Preview</p>
-                  <p className="text-xs text-neutral-500 mt-1">
+                  <p className="font-semibold text-neutral-300">Document / PDF</p>
+                  <p className="text-xs text-neutral-500">
                     {file.name} ({formatBytes(file.size)})
                   </p>
-                  <button
-                    onClick={handleDownload}
-                    className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-semibold"
-                  >
-                    Download to Open
-                  </button>
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                    {file.url && (
+                      <button
+                        onClick={() => openRealFile(file.url!)}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                      >
+                        <ExternalLink size={14} /> Open in Document App / दस्तावेज़ खोलें
+                      </button>
+                    )}
+                    <button
+                      onClick={handleDownload}
+                      className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-full text-xs font-semibold"
+                    >
+                      Download
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -188,11 +238,30 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
               <div className="w-16 h-16 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center mx-auto">
                 {file.type === 'apk' ? <Package size={36} /> : <File size={36} />}
               </div>
-              <h3 className="text-sm font-semibold truncate">{file.name}</h3>
+              <h3 className="text-sm font-semibold truncate text-white">{file.name}</h3>
               <p className="text-xs text-neutral-400">{formatBytes(file.size)} • {file.mimeType}</p>
+              
+              {file.type === 'apk' && file.url && (
+                <button
+                  onClick={() => openRealFile(file.url!)}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm"
+                >
+                  <Package size={16} /> Install App / ऐप इनस्टॉल करें
+                </button>
+              )}
+
+              {file.type !== 'apk' && file.url && (
+                <button
+                  onClick={() => openRealFile(file.url!)}
+                  className="w-full py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-colors"
+                >
+                  <ExternalLink size={14} /> Open in Default App / ऐप में खोलें
+                </button>
+              )}
+
               <button
                 onClick={handleDownload}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors"
+                className="w-full py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl text-xs font-medium transition-colors"
               >
                 Download File
               </button>

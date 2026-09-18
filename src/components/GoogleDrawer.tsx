@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   X, 
   Sparkles, 
@@ -12,11 +12,11 @@ import {
   Languages, 
   CreditCard,
   ChevronRight,
-  ExternalLink
+  ExternalLink,
+  Info
 } from 'lucide-react';
 import { TabType, Language, StorageBreakdown } from '../types';
 import { GoogleFilesLogo } from './GoogleFilesLogo';
-import { PWAInstallButton } from './PWAInstallButton';
 import { formatBytes } from '../utils/storage';
 import { translations } from '../utils/translations';
 
@@ -51,6 +51,7 @@ export const GoogleDrawer: React.FC<GoogleDrawerProps> = ({
   userEmail = 'akashkumarmddcmmb@gmail.com',
   userName = 'Akash Kumar',
 }) => {
+  const [showHelp, setShowHelp] = useState(false);
   const t = translations[language];
 
   if (!isOpen) return null;
@@ -236,23 +237,29 @@ export const GoogleDrawer: React.FC<GoogleDrawerProps> = ({
           </button>
 
           <button
-            onClick={() => {
-              alert("Google Files Help & Feedback: This app provides official Google Files features including Storage Cleaning, Category Browsing, SD Card transfer with live MBPS speed control, and Offline Sharing.");
-            }}
+            onClick={() => setShowHelp(prev => !prev)}
             className="w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
           >
             <HelpCircle size={20} className="text-neutral-500" />
             <span>Help & feedback</span>
           </button>
-          
-          <div className="pt-2 pb-1 px-3">
-            <PWAInstallButton />
-          </div>
+
+          {showHelp && (
+            <div className="mx-3 my-2 p-3 bg-blue-50 border border-blue-200/80 rounded-xl text-xs text-blue-900 animate-in fade-in duration-150">
+              <div className="flex items-center gap-1.5 font-semibold text-blue-950 mb-1">
+                <Info size={14} className="text-blue-600" />
+                <span>Google Files v2.4 (Offline)</span>
+              </div>
+              <p className="text-[11px] text-blue-800 leading-relaxed">
+                Full offline file manager with Storage Cleaning, Internal & SD Card Explorer, MP3 Music Player, Video Player, PDF Reader, and High-Speed Transfers.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Footer info */}
         <div className="p-4 border-t border-neutral-100 bg-[#f8fafd] text-[11px] text-neutral-400 text-center">
-          Google LLC • Privacy Policy • Terms of Service
+          Google LLC • Offline Edition
         </div>
       </div>
     </div>

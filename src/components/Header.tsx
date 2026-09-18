@@ -52,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
   const t = translations[language];
 
   return (
-    <header className="sticky top-0 z-30 bg-[#f8fafd]/95 backdrop-blur-md px-3 sm:px-6 pt-2.5 pb-2 transition-colors">
+    <header className="sticky top-0 z-30 bg-[#f8fafd]/95 backdrop-blur-md px-3 sm:px-6 pt-[max(0.625rem,env(safe-area-inset-top))] pb-2 transition-colors">
       <div className="max-w-4xl mx-auto">
         {/* Google Files Signature Material 3 Floating Search Bar */}
         <div className="bg-white rounded-full border border-neutral-200/90 shadow-xs hover:shadow-md transition-shadow px-2.5 sm:px-4 py-1.5 flex items-center gap-2 sm:gap-3">

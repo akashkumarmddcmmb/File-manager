@@ -72,10 +72,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           </p>
 
           <button 
-            onClick={() => alert("Google Account settings are simulated in this preview.")}
+            onClick={onOpenStorageBreakdown}
             className="mt-3 px-4 py-1.5 text-xs font-medium text-neutral-700 hover:text-blue-700 bg-neutral-100 hover:bg-neutral-200/80 rounded-full border border-neutral-200 transition-colors cursor-pointer"
           >
-            Manage your Google Account
+            Manage Storage & Account
           </button>
         </div>
 

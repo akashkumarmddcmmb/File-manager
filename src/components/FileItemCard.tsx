@@ -15,11 +15,13 @@ import {
   Edit2,
   Copy,
   FolderInput,
-  Share2
+  Share2,
+  Play,
+  ExternalLink
 } from 'lucide-react';
 import { FileItem, ViewMode } from '../types';
 import { formatBytes, formatDate } from '../utils/storage';
-import { triggerHapticFeedback, shareNativeFile } from '../utils/nativeStorage';
+import { triggerHapticFeedback, shareNativeFile, openRealFile } from '../utils/nativeStorage';
 
 interface FileItemCardProps {
   file: FileItem;
@@ -151,10 +153,22 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
               <div className="absolute right-0 mt-1 w-44 bg-white border border-neutral-200 rounded-xl shadow-lg z-50 py-1 text-xs text-neutral-700 animate-in fade-in zoom-in-95">
                 <button
                   onClick={() => { setShowMenu(false); onOpenPreview(file); }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2"
+                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 font-medium text-neutral-800"
                 >
-                  <Info size={14} /> Open preview
+                  {file.type === 'audio' ? <Music size={14} className="text-amber-500" /> : file.type === 'video' ? <Film size={14} className="text-rose-500" /> : file.type === 'document' ? <FileText size={14} className="text-emerald-500" /> : <Info size={14} />}
+                  {file.type === 'audio' ? 'Play Song' : file.type === 'video' ? 'Play Video' : file.type === 'document' ? 'Read Document' : 'Open Preview'}
                 </button>
+                {file.url && (
+                  <button
+                    onClick={() => { 
+                      setShowMenu(false); 
+                      openRealFile(file.url!);
+                    }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-emerald-700 font-medium"
+                  >
+                    <ExternalLink size={14} /> Open in Phone App
+                  </button>
+                )}
                 <button
                   onClick={() => { 
                     setShowMenu(false); 
@@ -274,6 +288,22 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
             <Star size={13} className="fill-amber-400 text-amber-400" />
           </div>
         )}
+
+        {/* Audio / Video Play Badge */}
+        {(file.type === 'audio' || file.type === 'video') && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-xs flex items-center justify-center text-white shadow-md group-hover:scale-110 group-hover:bg-amber-500 group-hover:text-neutral-950 transition-all">
+              <Play size={16} className="fill-current ml-0.5" />
+            </div>
+          </div>
+        )}
+
+        {/* Document PDF Badge */}
+        {file.type === 'document' && (
+          <div className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-emerald-600/90 text-white text-[9px] font-bold uppercase tracking-wider shadow-xs pointer-events-none">
+            {file.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'DOC'}
+          </div>
+        )}
       </div>
 
       {/* Card Info Footer */}
@@ -302,10 +332,22 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
               <div className="absolute right-0 bottom-full mb-1 w-44 bg-white border border-neutral-200 rounded-xl shadow-lg z-50 py-1 text-xs text-neutral-700 animate-in fade-in zoom-in-95">
                 <button
                   onClick={() => { setShowMenu(false); onOpenPreview(file); }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2"
+                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 font-medium text-neutral-800"
                 >
-                  <Info size={14} /> Open
+                  {file.type === 'audio' ? <Music size={14} className="text-amber-500" /> : file.type === 'video' ? <Film size={14} className="text-rose-500" /> : file.type === 'document' ? <FileText size={14} className="text-emerald-500" /> : <Info size={14} />}
+                  {file.type === 'audio' ? 'Play Song' : file.type === 'video' ? 'Play Video' : file.type === 'document' ? 'Read Document' : 'Open'}
                 </button>
+                {file.url && (
+                  <button
+                    onClick={() => { 
+                      setShowMenu(false); 
+                      openRealFile(file.url!);
+                    }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-emerald-700 font-medium"
+                  >
+                    <ExternalLink size={14} /> Open in Phone App
+                  </button>
+                )}
                 <button
                   onClick={() => { 
                     setShowMenu(false); 

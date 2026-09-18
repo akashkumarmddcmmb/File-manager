@@ -1,8 +1,69 @@
+import { registerPlugin } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Device } from '@capacitor/device';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Share } from '@capacitor/share';
 import { FileItem, FolderItem } from '../types';
+
+export interface StorageVolumeInfo {
+  name: string;
+  path: string;
+  totalBytes: number;
+  freeBytes: number;
+  usedBytes: number;
+}
+
+export interface RealStoragePluginInterface {
+  checkPermission(): Promise<{ granted: boolean; sdkInt: number; needsManageSettings: boolean }>;
+  requestAllFilesPermission(): Promise<{ openedSettings: boolean; granted: boolean }>;
+  getStorageVolumes(): Promise<{
+    internal: StorageVolumeInfo;
+    sdcard: StorageVolumeInfo | null;
+  }>;
+  listDirectory(options: { path?: string }): Promise<{
+    currentPath: string;
+    exists: boolean;
+    canRead: boolean;
+    files: Array<{
+      id: string;
+      name: string;
+      path: string;
+      folder: string;
+      size: number;
+      lastModified: number;
+      extension: string;
+      mimeType: string;
+      type: FileItem['type'];
+      storageDevice?: 'internal' | 'sdcard';
+    }>;
+    folders: Array<{
+      id: string;
+      name: string;
+      path: string;
+      parentPath: string;
+      lastModified: number;
+      storageDevice: 'internal' | 'sdcard';
+    }>;
+  }>;
+  scanMediaCategory(options: { category: string }): Promise<{
+    files: Array<{
+      id: string;
+      name: string;
+      path: string;
+      folder: string;
+      size: number;
+      lastModified: number;
+      extension: string;
+      mimeType: string;
+      type: FileItem['type'];
+      storageDevice?: 'internal' | 'sdcard';
+    }>;
+  }>;
+  deleteFile(options: { path: string }): Promise<{ success: boolean }>;
+  openFileWithApp(options: { path: string }): Promise<{ success: boolean }>;
+}
+
+export const RealDeviceStorage = registerPlugin<RealStoragePluginInterface>('RealDeviceStorage');
 
 /**
  * Trigger subtle Android haptic feedback on user taps & interactions
@@ -47,133 +108,298 @@ export async function isNativePlatform(): Promise<boolean> {
 }
 
 /**
- * Request Storage permissions for Android 10, 11, 12, 13, 14+
+ * Check if Android 11+ "All files access" is granted
  */
-export async function requestNativeStoragePermissions(): Promise<boolean> {
+export async function checkStoragePermissionStatus(): Promise<{
+  granted: boolean;
+  needsManageSettings: boolean;
+}> {
+  const isNative = await isNativePlatform();
+  if (!isNative) {
+    return { granted: true, needsManageSettings: false };
+  }
+
   try {
-    const check = await Filesystem.checkPermissions();
-    if (check.publicStorage === 'granted') {
-      return true;
-    }
-    const request = await Filesystem.requestPermissions();
-    return request.publicStorage === 'granted';
-  } catch (error) {
-    console.error('Permission request error:', error);
+    const res = await RealDeviceStorage.checkPermission();
+    return {
+      granted: res.granted,
+      needsManageSettings: res.needsManageSettings,
+    };
+  } catch (e) {
+    console.warn('Check permission error, falling back:', e);
+    return { granted: false, needsManageSettings: true };
+  }
+}
+
+/**
+ * Prompt user to open Android Settings to toggle "Allow management of all files"
+ */
+export async function requestAllFilesAccess(): Promise<boolean> {
+  try {
+    await triggerHapticFeedback(ImpactStyle.Heavy);
+    const res = await RealDeviceStorage.requestAllFilesPermission();
+    return res.granted;
+  } catch (e) {
+    console.error('Request all files access error:', e);
     return false;
   }
 }
 
 /**
- * Helper to determine file classification
+ * Open file in real Android default app (e.g. Gallery, Music Player, PDF reader)
  */
-function classifyFileType(ext: string): { type: FileItem['type']; mime: string } {
-  if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'heic'].includes(ext)) {
-    return { type: 'image', mime: `image/${ext === 'jpg' ? 'jpeg' : ext}` };
+export async function openRealFile(path: string): Promise<boolean> {
+  try {
+    await triggerHapticFeedback(ImpactStyle.Light);
+    const res = await RealDeviceStorage.openFileWithApp({ path });
+    return res.success;
+  } catch (e) {
+    console.error('Open file error:', e);
+    return false;
   }
-  if (['mp4', 'mkv', 'webm', 'mov', '3gp', 'avi'].includes(ext)) {
-    return { type: 'video', mime: 'video/mp4' };
-  }
-  if (['mp3', 'wav', 'aac', 'flac', 'm4a', 'ogg', 'opus'].includes(ext)) {
-    return { type: 'audio', mime: 'audio/mpeg' };
-  }
-  if (['apk', 'xapk', 'apks'].includes(ext)) {
-    return { type: 'app', mime: 'application/vnd.android.package-archive' };
-  }
-  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) {
-    return { type: 'archive', mime: 'application/zip' };
-  }
-  if (['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'csv'].includes(ext)) {
-    return { type: 'document', mime: ext === 'pdf' ? 'application/pdf' : 'text/plain' };
-  }
-  return { type: 'document', mime: 'application/octet-stream' };
 }
 
 /**
- * Reads real files and directories from device storage:
- * - Documents (/Documents)
- * - Music / Audio
- * - Downloads
- * - Pictures / DCIM
- * - SD Card
+ * Delete a real file from storage
  */
-export async function scanNativeStorage(): Promise<{ files: FileItem[]; folders: FolderItem[] } | null> {
+export async function deleteRealFile(path: string): Promise<boolean> {
+  try {
+    await triggerHapticFeedback(ImpactStyle.Medium);
+    const res = await RealDeviceStorage.deleteFile({ path });
+    return res.success;
+  } catch (e) {
+    console.error('Delete real file error:', e);
+    return false;
+  }
+}
+
+/**
+ * Fetch real Storage Volumes (Internal & SD Card)
+ */
+export async function getRealStorageVolumes(): Promise<{
+  internal: StorageVolumeInfo | null;
+  sdcard: StorageVolumeInfo | null;
+}> {
+  const isNative = await isNativePlatform();
+  if (!isNative) {
+    return { internal: null, sdcard: null };
+  }
+
+  try {
+    const res = await RealDeviceStorage.getStorageVolumes();
+    return {
+      internal: res.internal || null,
+      sdcard: res.sdcard || null,
+    };
+  } catch (e) {
+    console.warn('Get storage volumes error:', e);
+    return { internal: null, sdcard: null };
+  }
+}
+
+/**
+ * Scan real files and folders from the device
+ */
+export async function scanNativeStorage(): Promise<{
+  files: FileItem[];
+  folders: FolderItem[];
+  volumes?: { internal: StorageVolumeInfo | null; sdcard: StorageVolumeInfo | null };
+} | null> {
   const isNative = await isNativePlatform();
   if (!isNative) {
     return null;
   }
 
   try {
-    const hasPerm = await requestNativeStoragePermissions();
-    if (!hasPerm) {
-      console.warn('Storage permissions not granted');
+    const perm = await checkStoragePermissionStatus();
+    if (!perm.granted) {
+      console.log('All files permission not granted yet');
     }
 
-    const realFolders: FolderItem[] = [
-      { id: 'f-root', name: 'Internal Storage', path: '/', parentPath: '', storageDevice: 'internal', createdAt: new Date().toISOString() },
-      { id: 'f-dcim', name: 'DCIM (Camera)', path: '/DCIM', parentPath: '/', storageDevice: 'internal', createdAt: new Date().toISOString() },
-      { id: 'f-pictures', name: 'Pictures & Screenshots', path: '/Pictures', parentPath: '/', storageDevice: 'internal', createdAt: new Date().toISOString() },
-      { id: 'f-music', name: 'Audio & Music', path: '/Music', parentPath: '/', storageDevice: 'internal', createdAt: new Date().toISOString() },
-      { id: 'f-download', name: 'Downloads', path: '/Download', parentPath: '/', storageDevice: 'internal', createdAt: new Date().toISOString() },
-      { id: 'f-documents', name: 'Documents & PDFs', path: '/Documents', parentPath: '/', storageDevice: 'internal', createdAt: new Date().toISOString() },
-      { id: 'f-sd-root', name: 'SanDisk SD Card', path: '/', parentPath: '', storageDevice: 'sdcard', createdAt: new Date().toISOString() },
-      { id: 'f-sd-backup', name: 'SD Backups', path: '/Backups', parentPath: '/', storageDevice: 'sdcard', createdAt: new Date().toISOString() },
-      { id: 'f-sd-movies', name: 'SD Movies', path: '/Movies', parentPath: '/', storageDevice: 'sdcard', createdAt: new Date().toISOString() },
-    ];
+    // 1. Get real volume info
+    const volumes = await getRealStorageVolumes();
 
-    const realFiles: FileItem[] = [];
+    // 2. Fetch root directory items (DCIM, Download, Documents, Music, Pictures, etc.)
+    const internalRoot = volumes.internal?.path || '/storage/emulated/0';
+    const rootDirResult = await RealDeviceStorage.listDirectory({ path: internalRoot }).catch(() => null);
 
-    // Scan directories
-    const scanDirs = [
-      { dir: Directory.Documents, folderPath: '/Documents' },
-      { dir: Directory.Data, folderPath: '/Download' },
-      { dir: Directory.Cache, folderPath: '/DCIM' },
-    ];
+    // 3. Scan media categories (Audio, Images, Video, Downloads, Docs)
+    const mediaCategories = ['audio', 'images', 'videos', 'documents', 'apps', 'downloads'];
+    const collectedFiles: FileItem[] = [];
 
-    for (const target of scanDirs) {
-      try {
-        const dirContents = await Filesystem.readdir({
-          directory: target.dir,
-          path: '',
+    if (rootDirResult && rootDirResult.files) {
+      for (const f of rootDirResult.files) {
+        collectedFiles.push({
+          id: f.id,
+          name: f.name,
+          size: f.size,
+          type: f.type,
+          mimeType: f.mimeType,
+          folder: f.folder,
+          storageDevice: f.storageDevice || (f.path.includes('emulated') ? 'internal' : 'sdcard'),
+          url: f.path,
+          createdAt: new Date(f.lastModified || Date.now()).toISOString(),
+          updatedAt: new Date(f.lastModified || Date.now()).toISOString(),
         });
+      }
+    }
 
-        for (const item of dirContents.files) {
-          if (item.type === 'file') {
-            const ext = item.name.split('.').pop()?.toLowerCase() || '';
-            const { type, mime } = classifyFileType(ext);
-
-            realFiles.push({
-              id: `real-${item.name}-${Math.random().toString(36).substring(2, 7)}`,
-              name: item.name,
-              size: item.size || 1024 * 128,
-              type,
-              mimeType: mime,
-              folder: target.folderPath,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              url: item.uri || '',
-            });
-          } else if (item.type === 'directory') {
-            realFolders.push({
-              id: `real-dir-${item.name}`,
-              name: item.name,
-              path: `${target.folderPath}/${item.name}`,
-              parentPath: target.folderPath,
-              storageDevice: 'internal',
-              createdAt: new Date().toISOString(),
+    // Also scan common media stores for complete coverage
+    for (const cat of ['audio', 'images', 'videos', 'documents', 'apps']) {
+      try {
+        const catRes = await RealDeviceStorage.scanMediaCategory({ category: cat });
+        if (catRes && catRes.files) {
+          for (const f of catRes.files) {
+            collectedFiles.push({
+              id: f.id,
+              name: f.name,
+              size: f.size,
+              type: f.type,
+              mimeType: f.mimeType,
+              folder: f.folder,
+              storageDevice: f.storageDevice || (f.path.includes('emulated') ? 'internal' : 'sdcard'),
+              url: f.path,
+              createdAt: new Date(f.lastModified || Date.now()).toISOString(),
+              updatedAt: new Date(f.lastModified || Date.now()).toISOString(),
             });
           }
         }
-      } catch (e) {
-        // Continue scanning remaining locations
+      } catch (catErr) {
+        // continue
+      }
+    }
+
+    // Deduplicate files by path/id
+    const seen = new Set<string>();
+    const uniqueFiles: FileItem[] = [];
+    for (const file of collectedFiles) {
+      const key = file.url || file.name;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueFiles.push(file);
+      }
+    }
+
+    // Build Folder items
+    const collectedFolders: FolderItem[] = [];
+    if (rootDirResult && rootDirResult.folders) {
+      for (const fold of rootDirResult.folders) {
+        collectedFolders.push({
+          id: fold.id,
+          name: fold.name,
+          path: fold.path,
+          parentPath: fold.parentPath,
+          storageDevice: fold.storageDevice,
+          createdAt: new Date(fold.lastModified || Date.now()).toISOString(),
+        });
+      }
+    }
+
+    // Add SD card root if detected
+    if (volumes.sdcard) {
+      collectedFolders.unshift({
+        id: 'sdcard-root',
+        name: volumes.sdcard.name,
+        path: volumes.sdcard.path,
+        parentPath: '',
+        storageDevice: 'sdcard',
+        createdAt: new Date().toISOString(),
+      });
+      // Also list SD card root folders & files
+      try {
+        const sdList = await RealDeviceStorage.listDirectory({ path: volumes.sdcard.path });
+        if (sdList) {
+          if (sdList.folders) {
+            for (const fold of sdList.folders) {
+              collectedFolders.push({
+                id: fold.id,
+                name: fold.name,
+                path: fold.path,
+                parentPath: fold.parentPath,
+                storageDevice: 'sdcard',
+                createdAt: new Date(fold.lastModified || Date.now()).toISOString(),
+              });
+            }
+          }
+          if (sdList.files) {
+            for (const f of sdList.files) {
+              const key = f.path || f.name;
+              if (!seen.has(key)) {
+                seen.add(key);
+                uniqueFiles.push({
+                  id: f.id,
+                  name: f.name,
+                  size: f.size,
+                  type: f.type,
+                  mimeType: f.mimeType,
+                  folder: f.folder,
+                  storageDevice: 'sdcard',
+                  url: f.path,
+                  createdAt: new Date(f.lastModified || Date.now()).toISOString(),
+                  updatedAt: new Date(f.lastModified || Date.now()).toISOString(),
+                });
+              }
+            }
+          }
+        }
+      } catch {
+        // SD read fallback
       }
     }
 
     return {
-      files: realFiles,
-      folders: realFolders,
+      files: uniqueFiles,
+      folders: collectedFolders,
+      volumes,
     };
   } catch (err) {
-    console.error('Error scanning native storage:', err);
+    console.error('Error scanning native real storage:', err);
+    return null;
+  }
+}
+
+/**
+ * Dynamically list files and folders inside any real device path (internal or SD card)
+ */
+export async function listRealDirectoryFiles(targetPath: string): Promise<{
+  files: FileItem[];
+  folders: FolderItem[];
+} | null> {
+  const isNative = await isNativePlatform();
+  if (!isNative) return null;
+
+  try {
+    const res = await RealDeviceStorage.listDirectory({ path: targetPath });
+    if (!res || !res.exists) return null;
+
+    const isInternal = targetPath.includes('emulated') || !targetPath.startsWith('/storage/');
+    const dev = isInternal ? 'internal' : 'sdcard';
+
+    const files: FileItem[] = (res.files || []).map(f => ({
+      id: f.id,
+      name: f.name,
+      size: f.size,
+      type: f.type,
+      mimeType: f.mimeType,
+      folder: f.folder,
+      storageDevice: f.storageDevice || dev,
+      url: f.path,
+      createdAt: new Date(f.lastModified || Date.now()).toISOString(),
+      updatedAt: new Date(f.lastModified || Date.now()).toISOString(),
+    }));
+
+    const folders: FolderItem[] = (res.folders || []).map(fold => ({
+      id: fold.id,
+      name: fold.name,
+      path: fold.path,
+      parentPath: fold.parentPath,
+      storageDevice: fold.storageDevice || dev,
+      createdAt: new Date(fold.lastModified || Date.now()).toISOString(),
+    }));
+
+    return { files, folders };
+  } catch (e) {
+    console.warn('Failed to dynamically list path:', targetPath, e);
     return null;
   }
 }

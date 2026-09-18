@@ -10,7 +10,9 @@ import {
   Search,
   Filter,
   Copy,
-  FolderInput
+  FolderInput,
+  Play,
+  Shuffle
 } from 'lucide-react';
 import { FileCategory, FileItem, ViewMode, SortOption, Language } from '../types';
 import { filterFilesByCategory, sortFiles, formatBytes } from '../utils/storage';
@@ -170,6 +172,29 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Quick Play All Bar for Audio Tracks */}
+      {category === 'audio' && categoryFiles.length > 0 && (
+        <div className="flex items-center gap-2 px-1">
+          <button
+            onClick={() => onOpenPreview(categoryFiles[0])}
+            className="flex-1 py-2.5 px-4 bg-amber-500 hover:bg-amber-600 active:scale-98 text-neutral-950 font-bold rounded-2xl text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+          >
+            <Play size={15} className="fill-neutral-950" />
+            <span>{language === 'hi' ? 'सभी गाने चलाएं' : 'Play All Songs'}</span>
+          </button>
+          <button
+            onClick={() => {
+              const randomIdx = Math.floor(Math.random() * categoryFiles.length);
+              onOpenPreview(categoryFiles[randomIdx]);
+            }}
+            className="py-2.5 px-4 bg-white hover:bg-neutral-50 active:scale-98 text-neutral-800 font-semibold rounded-2xl text-xs flex items-center justify-center gap-2 border border-neutral-200/80 shadow-xs transition-all cursor-pointer"
+          >
+            <Shuffle size={15} className="text-amber-600" />
+            <span>{language === 'hi' ? 'शफ़ल' : 'Shuffle'}</span>
+          </button>
+        </div>
+      )}
 
       {/* Filter Chips */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">

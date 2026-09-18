@@ -18,7 +18,8 @@ import {
 import { FileCategory, FileItem, StorageBreakdown, ViewMode, SortOption, Language, StorageDevice } from '../types';
 import { formatBytes } from '../utils/storage';
 import { translations } from '../utils/translations';
-import { triggerHapticFeedback } from '../utils/nativeStorage';
+import { triggerHapticFeedback, StorageVolumeInfo } from '../utils/nativeStorage';
+import { ShieldAlert, RefreshCw, FolderLock } from 'lucide-react';
 
 interface BrowseTabProps {
   files: FileItem[];
@@ -26,6 +27,11 @@ interface BrowseTabProps {
   viewMode: ViewMode;
   sortOption: SortOption;
   language: Language;
+  realVolumes?: { internal: StorageVolumeInfo | null; sdcard: StorageVolumeInfo | null } | null;
+  permStatus?: { granted: boolean; needsManageSettings: boolean };
+  isScanningStorage?: boolean;
+  onRequestPermissions?: () => void;
+  onRefreshStorage?: () => void;
   onSelectCategory: (cat: FileCategory) => void;
   onOpenFolderView: (device?: StorageDevice) => void;
   onOpenSafeFolder: () => void;
@@ -46,6 +52,11 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
   viewMode,
   sortOption,
   language,
+  realVolumes,
+  permStatus,
+  isScanningStorage,
+  onRequestPermissions,
+  onRefreshStorage,
   onSelectCategory,
   onOpenFolderView,
   onOpenSafeFolder,
@@ -73,16 +84,20 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
   const videosFiles = files.filter(f => !f.isTrash && !f.isSafe && f.type === 'video');
   const audioFiles = files.filter(f => !f.isTrash && !f.isSafe && f.type === 'audio');
   const docsFiles = files.filter(f => !f.isTrash && !f.isSafe && (f.type === 'document' || f.type === 'archive' || f.type === 'other'));
-  const appsFiles = files.filter(f => !f.isTrash && !f.isSafe && f.type === 'apk');
+  const appsFiles = files.filter(f => !f.isTrash && !f.isSafe && (f.type === 'apk' || f.name.endsWith('.apk')));
   const starredFiles = files.filter(f => !f.isTrash && !f.isSafe && f.isStarred);
   const safeFiles = files.filter(f => !f.isTrash && f.isSafe);
   const trashFiles = files.filter(f => f.isTrash);
 
-  // SD card storage calculations
-  const sdCardFiles = files.filter(f => f.storageDevice === 'sdcard' && !f.isTrash);
-  const sdCardUsedBytes = sdCardFiles.reduce((acc, f) => acc + f.size, 0) + (1420 * 1024 * 1024); // mock system overhead
-  const sdCardTotalBytes = 128 * 1024 * 1024 * 1024;
-  const sdCardFreeBytes = Math.max(0, sdCardTotalBytes - sdCardUsedBytes);
+  // Storage calculations from real volumes or fallback
+  const internalTotal = realVolumes?.internal ? realVolumes.internal.totalBytes : storage.total;
+  const internalUsed = realVolumes?.internal ? realVolumes.internal.usedBytes : storage.used;
+  const internalFree = realVolumes?.internal ? realVolumes.internal.freeBytes : storage.free;
+
+  const sdCardTotalBytes = realVolumes?.sdcard ? realVolumes.sdcard.totalBytes : (128 * 1024 * 1024 * 1024);
+  const sdCardUsedBytes = realVolumes?.sdcard ? realVolumes.sdcard.usedBytes : (44.8 * 1024 * 1024 * 1024);
+  const sdCardFreeBytes = realVolumes?.sdcard ? realVolumes.sdcard.freeBytes : (sdCardTotalBytes - sdCardUsedBytes);
+  const sdCardLabel = realVolumes?.sdcard ? realVolumes.sdcard.name : 'SanDisk 128 GB';
 
   // Official Google Files Category Icons & Pastel Circles
   const categories = [
@@ -312,18 +327,68 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
         </div>
       </section>
 
+      {/* Permission Banner if Storage Access not granted on Android 11+ */}
+      {permStatus && !permStatus.granted && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-xs">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 shrink-0">
+              <FolderLock size={20} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-semibold text-neutral-900">
+                {language === 'hi' ? 'फ़ोन मेमोरी व SD कार्ड अनुमति आवश्यक है' : 'Device & SD Card Access Required'}
+              </h3>
+              <p className="text-xs text-neutral-600 mt-1 leading-relaxed">
+                {language === 'hi'
+                  ? 'आपके डिवाइस की इंटरनल मेमोरी और मेमोरी कार्ड (SD Card) को एक्सेस करने के लिए Android की "All Files Access" अनुमति देना आवश्यक है।'
+                  : 'Grant All Files Access so Google Files can display your songs, videos, documents and SD card files.'}
+              </p>
+              {onRequestPermissions && (
+                <button
+                  onClick={() => {
+                    triggerHapticFeedback();
+                    onRequestPermissions();
+                  }}
+                  className="mt-3 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all text-white text-xs font-medium rounded-full shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ShieldAlert size={14} />
+                  {language === 'hi' ? 'अनुमति दें (Allow Storage Access)' : 'Grant Storage Access'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 4. Storage Devices (Internal Storage & SD Card) */}
       <section className="space-y-2.5">
-        <h2 className="text-sm font-semibold text-neutral-800 tracking-tight px-1">
-          {t.storageDevices}
-        </h2>
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-sm font-semibold text-neutral-800 tracking-tight">
+            {t.storageDevices}
+          </h2>
+          {onRefreshStorage && (
+            <button
+              onClick={() => {
+                triggerHapticFeedback();
+                onRefreshStorage();
+              }}
+              disabled={isScanningStorage}
+              className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 font-medium cursor-pointer"
+            >
+              <RefreshCw size={12} className={isScanningStorage ? 'animate-spin' : ''} />
+              {isScanningStorage 
+                ? (language === 'hi' ? 'स्कैन हो रहा है...' : 'Scanning...') 
+                : (language === 'hi' ? 'डिवाइस रिफ्रेश करें' : 'Rescan Storage')}
+            </button>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Internal Storage Card */}
           <div
             id="storage-device-internal"
             onClick={() => onOpenFolderView('internal')}
-            className="bg-white p-4 rounded-2xl border border-neutral-200/90 hover:border-blue-400 hover:shadow-sm transition-all flex items-center justify-between cursor-pointer group"
+            className="bg-white p-4 rounded-2xl border border-neutral-200/90 hover:border-blue-400 hover:shadow-sm transition-all flex items-center justify-between cursor-pointer group active:scale-[0.99]"
           >
             <div className="flex items-center gap-3.5 min-w-0 flex-1">
               <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100/80">
@@ -335,28 +400,28 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
                     {t.internalStorage}
                   </h3>
                   <span className="text-[11px] font-medium text-neutral-500">
-                    {Math.round((storage.used / storage.total) * 100)}%
+                    {Math.round((internalUsed / internalTotal) * 100)}%
                   </span>
                 </div>
                 <div className="w-full h-2 bg-neutral-100 rounded-full overflow-hidden mt-1.5 mb-1">
                   <div
                     className="h-full bg-blue-600 rounded-full transition-all duration-300"
-                    style={{ width: `${Math.min(100, (storage.used / storage.total) * 100)}%` }}
+                    style={{ width: `${Math.min(100, (internalUsed / internalTotal) * 100)}%` }}
                   />
                 </div>
                 <p className="text-[11px] text-neutral-500">
-                  {formatBytes(storage.free)} {t.free} of {formatBytes(storage.total, 0)}
+                  {formatBytes(internalFree)} {t.free} of {formatBytes(internalTotal, 0)}
                 </p>
               </div>
             </div>
             <ChevronRight size={18} className="text-neutral-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0" />
           </div>
 
-          {/* SD Card (SanDisk Removable Storage) Card */}
+          {/* SD Card (Memory Card) Card */}
           <div
             id="storage-device-sdcard"
             onClick={() => onOpenFolderView('sdcard')}
-            className="bg-white p-4 rounded-2xl border border-neutral-200/90 hover:border-purple-400 hover:shadow-sm transition-all flex items-center justify-between cursor-pointer group"
+            className="bg-white p-4 rounded-2xl border border-neutral-200/90 hover:border-purple-400 hover:shadow-sm transition-all flex items-center justify-between cursor-pointer group active:scale-[0.99]"
           >
             <div className="flex items-center gap-3.5 min-w-0 flex-1">
               <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 border border-purple-100/80">
@@ -368,8 +433,8 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
                     <h3 className="text-sm font-semibold text-neutral-900 truncate">
                       {t.sdCard}
                     </h3>
-                    <span className="px-1.5 py-0.2 text-[9px] font-bold bg-purple-100 text-purple-700 rounded-md">
-                      SanDisk 128 GB
+                    <span className="px-1.5 py-0.2 text-[9px] font-bold bg-purple-100 text-purple-700 rounded-md truncate max-w-[120px]">
+                      {sdCardLabel}
                     </span>
                   </div>
                   <span className="text-[11px] font-medium text-purple-600">

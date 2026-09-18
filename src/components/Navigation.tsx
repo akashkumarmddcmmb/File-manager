@@ -38,7 +38,7 @@ export const Navigation: React.FC<NavigationProps> = ({
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/98 backdrop-blur-md border-t border-[#e1e3e1] py-1.5 px-4 shadow-sm">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/98 backdrop-blur-md border-t border-[#e1e3e1] py-1.5 px-4 shadow-sm pb-[max(0.375rem,env(safe-area-inset-bottom))]">
       <div className="max-w-md mx-auto flex items-center justify-around">
         {navItems.map((item) => {
           const isActive = activeTab === item.id;

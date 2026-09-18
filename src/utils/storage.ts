@@ -23,7 +23,12 @@ export function formatDate(dateString: string): string {
   });
 }
 
-export function computeStorage(files: FileItem[], junkBytes: number): StorageBreakdown {
+export function computeStorage(
+  files: FileItem[], 
+  junkBytes: number,
+  realTotal?: number,
+  realUsed?: number
+): StorageBreakdown {
   const activeFiles = files.filter(f => !f.isTrash);
   
   let images = 0;
@@ -59,13 +64,14 @@ export function computeStorage(files: FileItem[], junkBytes: number): StorageBre
     }
   });
 
+  const total = realTotal && realTotal > 0 ? realTotal : TOTAL_STORAGE_BYTES;
   const apps = APPS_BASE_BYTES + apkSize;
   const userFilesTotal = activeFiles.reduce((acc, f) => acc + f.size, 0);
-  const used = SYSTEM_BYTES + apps + userFilesTotal + junkBytes;
-  const free = Math.max(0, TOTAL_STORAGE_BYTES - used);
+  const used = realUsed && realUsed > 0 ? realUsed : (SYSTEM_BYTES + apps + userFilesTotal + junkBytes);
+  const free = Math.max(0, total - used);
 
   return {
-    total: TOTAL_STORAGE_BYTES,
+    total,
     used,
     free,
     system: SYSTEM_BYTES,
@@ -92,7 +98,7 @@ export function filterFilesByCategory(files: FileItem[], category: FileCategory)
     case 'documents':
       return files.filter(f => !f.isTrash && !f.isSafe && (f.type === 'document' || f.type === 'archive' || f.type === 'other'));
     case 'apps':
-      return files.filter(f => !f.isTrash && !f.isSafe && f.type === 'apk');
+      return files.filter(f => !f.isTrash && !f.isSafe && (f.type === 'apk' || f.name.endsWith('.apk')));
     case 'starred':
       return files.filter(f => !f.isTrash && !f.isSafe && f.isStarred);
     case 'safe':
