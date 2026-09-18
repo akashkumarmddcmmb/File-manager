@@ -18,6 +18,7 @@ import {
 import { FileCategory, FileItem, StorageBreakdown, ViewMode, SortOption, Language, StorageDevice } from '../types';
 import { formatBytes } from '../utils/storage';
 import { translations } from '../utils/translations';
+import { triggerHapticFeedback } from '../utils/nativeStorage';
 
 interface BrowseTabProps {
   files: FileItem[];
@@ -211,8 +212,11 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
             <button
               key={cat.id}
               id={`category-${cat.id}`}
-              onClick={() => onSelectCategory(cat.id)}
-              className="w-full bg-white p-3.5 rounded-2xl border border-neutral-200/90 hover:border-neutral-300 hover:shadow-xs transition-all flex items-center justify-between text-left group cursor-pointer"
+              onClick={() => {
+                triggerHapticFeedback();
+                onSelectCategory(cat.id);
+              }}
+              className="w-full bg-white p-3.5 rounded-2xl border border-neutral-200/90 hover:border-neutral-300 hover:shadow-xs transition-all flex items-center justify-between text-left group cursor-pointer active:scale-[0.98] transition-transform"
             >
               <div className="flex items-center gap-3.5 min-w-0">
                 <div className={`w-11 h-11 rounded-full ${cat.iconBg} flex items-center justify-center shrink-0`}>

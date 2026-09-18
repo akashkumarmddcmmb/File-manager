@@ -1,11 +1,23 @@
 # 📱 Files (Google Files Clone) - Android APK Build Guide
 
-इस प्रोजेक्ट को पूरी तरह से **Capacitor Android Native Project** में बदल दिया गया है। 
-इसके अंदर पूरा `android/` फोल्डर, Gradle फाइल्स, AndroidManifest (Storage Permissions के साथ) और Compiled Assets तैयार हैं।
+इस प्रोजेक्ट को पूरी तरह से **Capacitor Android Native Mobile App** में बदल दिया गया है, जिसमें असली डिवाइस के **Internal Storage, SD Card, Pictures, Downloads और Documents** को पढ़ने और मैनेज करने की क्षमता जोड़ी जा चुकी है।
 
 ---
 
-## तरीका 1: Android Studio से 1-क्लिक में APK बनाना (अनुशंसित)
+## 🔥 तरीका 1: GitHub Actions से बिना किसी कंप्यूटर के सीधे APK डाउनलोड करना (सबसे आसान)
+
+चूँकि हमने `.github/workflows/main.yml` फ़ाइल पूरी तरह तैयार कर दी है:
+
+1. ऊपर दाईं ओर **Settings (⚙️)** मेन्यू से **"Export to GitHub"** चुनें।
+2. अपना GitHub अकाउंट कनेक्ट करके इस प्रोजेक्ट को अपनी GitHub रिपॉजिटरी में पुश करें।
+3. अपनी GitHub रिपॉजिटरी में जाएँ और ऊपर **"Actions"** टैब पर क्लिक करें।
+4. वहाँ **"Build Android APK"** अपने-आप चलना शुरू हो जाएगा (1-2 मिनट लगेंगे)।
+5. प्रोसेस पूरा होते ही नीचे **Artifacts** में **`GoogleFiles-Android-App-APK`** का डाउनलोड लिंक मिलेगा।
+6. उस पर क्लिक करें — आपकी असली **`.apk` फ़ाइल डाउनलोड हो जाएगी**, जिसे आप सीधे अपने Android मोबाइल में इनस्टॉल कर सकते हैं!
+
+---
+
+## तरीका 2: Android Studio से 1-क्लिक में APK बनाना (कंप्यूटर पर)
 
 1. **ZIP डाउनलोड करें:**
    - ऊपर दाईं ओर **Settings (⚙️)** मेन्यू पर क्लिक करके **"Export as ZIP"** चुनें और फ़ाइल को अपने कंप्यूटर पर Extract (Unzip) करें।

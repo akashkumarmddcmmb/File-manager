@@ -14,10 +14,12 @@ import {
   Download,
   Edit2,
   Copy,
-  FolderInput
+  FolderInput,
+  Share2
 } from 'lucide-react';
 import { FileItem, ViewMode } from '../types';
 import { formatBytes, formatDate } from '../utils/storage';
+import { triggerHapticFeedback, shareNativeFile } from '../utils/nativeStorage';
 
 interface FileItemCardProps {
   file: FileItem;
@@ -152,6 +154,15 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
                   className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2"
                 >
                   <Info size={14} /> Open preview
+                </button>
+                <button
+                  onClick={() => { 
+                    setShowMenu(false); 
+                    shareNativeFile(file.name, `Sharing ${file.name} (${formatBytes(file.size)})`, file.url);
+                  }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-blue-600 font-medium"
+                >
+                  <Share2 size={14} /> Share file (Mobile)
                 </button>
                 <button
                   onClick={() => { setShowMenu(false); onToggleStar(file.id); }}
@@ -294,6 +305,15 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
                   className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2"
                 >
                   <Info size={14} /> Open
+                </button>
+                <button
+                  onClick={() => { 
+                    setShowMenu(false); 
+                    shareNativeFile(file.name, `Sharing ${file.name} (${formatBytes(file.size)})`, file.url);
+                  }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-blue-600 font-medium"
+                >
+                  <Share2 size={14} /> Share file (Mobile)
                 </button>
                 <button
                   onClick={() => { setShowMenu(false); onToggleStar(file.id); }}

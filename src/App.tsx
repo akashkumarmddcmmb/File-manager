@@ -31,6 +31,7 @@ import { AccountModal } from './components/AccountModal';
 import { FileItemCard } from './components/FileItemCard';
 import { translations } from './utils/translations';
 import { UploadCloud, CheckCircle2 } from 'lucide-react';
+import { scanNativeStorage, isNativePlatform } from './utils/nativeStorage';
 
 const STORAGE_FILES_KEY = 'google_files_app_files_v1';
 const STORAGE_FOLDERS_KEY = 'google_files_app_folders_v1';
@@ -92,6 +93,26 @@ export default function App() {
       console.error(e);
     }
   }, [junkBytes]);
+
+  // Check and read real device storage when running natively on Android
+  useEffect(() => {
+    async function loadRealDeviceStorage() {
+      const native = await isNativePlatform();
+      if (native) {
+        const result = await scanNativeStorage();
+        if (result && result.files.length > 0) {
+          setFiles(prev => {
+            // merge unique real files
+            const existingIds = new Set(prev.map(f => f.name));
+            const newFiles = result.files.filter(f => !existingIds.has(f.name));
+            return [...newFiles, ...prev];
+          });
+          setFolders(result.folders);
+        }
+      }
+    }
+    loadRealDeviceStorage();
+  }, []);
 
   // 2. Navigation & View State
   const [activeTab, setActiveTab] = useState<TabType>('browse');
