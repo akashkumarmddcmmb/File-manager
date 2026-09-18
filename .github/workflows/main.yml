@@ -1,0 +1,287 @@
+Create a complete native Android File Manager application from this GitHub repository:
+
+https://github.com/akashkumarmddcmmb/File-manager
+
+IMPORTANT:
+- First inspect the existing repository and understand its current files and functionality.
+- Do not delete useful existing functionality unnecessarily.
+- Convert/rebuild it as a proper Android application that can generate an APK.
+- Use Java + XML, NOT Jetpack Compose.
+- The final project must be directly buildable with Gradle.
+
+APP NAME:
+File Manager
+
+PACKAGE NAME:
+com.akash.filemanager
+
+REQUIREMENTS:
+
+1. PROJECT SETUP
+- Create a complete Android Studio Gradle project.
+- Use a stable Android Gradle Plugin and compatible Gradle configuration.
+- targetSdk 35 or higher if supported by the build environment.
+- minSdk 23.
+- Use AndroidX.
+- Use Java for application logic.
+- Use XML for all UI layouts.
+- Make sure all Gradle dependencies are compatible.
+
+2. MAIN SCREEN
+Create a clean File Manager interface containing:
+- App title: File Manager
+- Current folder/path display
+- File and folder list
+- Folder icon
+- File icon based on file type
+- File name
+- File size
+- Last modified date
+- Refresh button
+- Search button
+- New Folder button
+
+3. STORAGE ACCESS
+Use Android Storage Access Framework (SAF) and DocumentsContract where appropriate.
+
+The application must:
+- Allow the user to select a storage folder.
+- Remember the selected folder using persisted URI permission.
+- Display files and folders inside the selected folder.
+- Work correctly on modern Android versions.
+- Do not rely on deprecated broad storage permissions when SAF is appropriate.
+- Handle permission denial safely.
+
+4. FOLDER NAVIGATION
+- Tapping a folder opens that folder.
+- Show the current folder name/path.
+- Add a Back button for navigation.
+- Correctly navigate to parent folders.
+- Do not crash if the folder becomes unavailable.
+
+5. FILE OPERATIONS
+Implement these operations:
+
+- Open file
+- Share file
+- Rename file
+- Delete file
+- Copy file
+- Move file
+- Create new folder
+
+For destructive operations:
+- Show a confirmation dialog before deletion.
+- Show an error message if an operation fails.
+- Refresh the file list after every successful operation.
+
+6. LONG PRESS MENU
+When the user long-presses a file or folder, show a menu containing appropriate actions:
+
+For files:
+- Open
+- Share
+- Copy
+- Move
+- Rename
+- Delete
+
+For folders:
+- Open
+- Copy
+- Move
+- Rename
+- Delete
+
+7. NEW FOLDER
+When New Folder is selected:
+- Show an XML AlertDialog.
+- Ask for folder name.
+- Validate empty names.
+- Create the folder using DocumentsContract.
+- Refresh the list.
+- Show success/error feedback.
+
+8. RENAME
+- Show an XML AlertDialog.
+- Pre-fill the current name.
+- Validate the new name.
+- Rename using DocumentsContract.
+- Refresh the list.
+
+9. DELETE
+- Show confirmation dialog.
+- Delete the selected document using ContentResolver/DocumentsContract.
+- Refresh the list.
+- Never silently delete a file.
+
+10. COPY
+Implement a proper copy operation using ContentResolver streams where necessary.
+
+Requirements:
+- Allow selecting destination folder.
+- Copy files without corrupting them.
+- Copy folders recursively where supported.
+- Show progress if the operation can take time.
+- Handle errors.
+- Refresh destination folder after completion.
+
+11. MOVE
+Implement move functionality.
+
+- Select destination folder.
+- Use DocumentsContract.moveDocument where supported.
+- Provide a safe fallback when required.
+- Do not lose the source file if the operation fails.
+- Refresh the file list.
+
+12. SHARE
+Use Android ACTION_SEND and FileProvider/appropriate URI handling where required.
+- Grant temporary read permission.
+- Allow sharing files through installed Android applications.
+
+13. FILE OPENING
+Use ACTION_VIEW with the correct MIME type.
+Support common types:
+- PDF
+- Images
+- Video
+- Audio
+- Text
+- Documents
+- ZIP and other supported formats
+
+If no compatible application exists:
+Show:
+"No application found to open this file."
+
+14. SEARCH
+Add a search feature.
+- Search within the currently selected folder.
+- Search by file/folder name.
+- Case-insensitive search.
+- Update RecyclerView results.
+- Provide a clear/close search option.
+
+15. SORTING
+Add sorting options:
+- Name A-Z
+- Name Z-A
+- Size
+- Modified date
+- Folders first
+
+16. UI
+Use modern but simple Material-style XML UI.
+
+Create:
+- activity_main.xml
+- item_file.xml
+- dialog_new_folder.xml
+- dialog_rename.xml
+- appropriate menu XML files
+- drawable resources
+- values resources
+
+The interface must be usable on small Android phone screens.
+
+17. ERROR HANDLING
+The application must never crash because of:
+- Permission denied
+- Invalid URI
+- Missing file
+- Missing folder
+- File operation failure
+- Unsupported file type
+- No application available
+- Storage unavailable
+
+Show user-friendly Toast/Snackbar/Dialog messages.
+
+18. CODE STRUCTURE
+
+Create all required Java classes, for example:
+
+MainActivity.java
+FileItem.java
+FileAdapter.java
+FileOperationManager.java
+FileUtils.java
+
+Add additional classes if required.
+
+Keep the code organized and avoid putting all functionality into MainActivity.
+
+19. REQUIRED ANDROID FILES
+
+Create a complete project including:
+
+settings.gradle
+build.gradle
+gradle.properties
+
+app/build.gradle
+
+app/src/main/AndroidManifest.xml
+
+app/src/main/java/com/akash/filemanager/
+    MainActivity.java
+    FileItem.java
+    FileAdapter.java
+    FileOperationManager.java
+    FileUtils.java
+
+app/src/main/res/layout/
+    activity_main.xml
+    item_file.xml
+    dialog_new_folder.xml
+    dialog_rename.xml
+
+app/src/main/res/menu/
+    file_menu.xml
+    main_menu.xml
+
+app/src/main/res/values/
+    strings.xml
+    colors.xml
+    themes.xml
+
+Create any additional resources required by the application.
+
+20. MANIFEST
+Configure MainActivity correctly as the launcher activity.
+
+Do not add unnecessary permissions.
+
+21. BUILD REQUIREMENT
+
+After generating all files:
+
+1. Sync Gradle.
+2. Run the Android build.
+3. Find compilation errors.
+4. Fix all errors.
+5. Check XML errors.
+6. Check Java errors.
+7. Check Gradle errors.
+8. Build again.
+9. Continue fixing until the project builds successfully.
+
+FINAL BUILD COMMAND:
+
+./gradlew assembleDebug
+
+The final APK must be:
+
+app/build/outputs/apk/debug/app-debug.apk
+
+IMPORTANT:
+Do not just provide sample code.
+Do not provide incomplete snippets.
+Create the complete buildable Android project.
+Do not leave TODO placeholders for core File Manager functionality.
+Do not ask me to manually create missing files unless absolutely necessary.
+Use the existing GitHub repository as the starting point and preserve useful existing functionality.
+
+FINAL RESULT:
+A complete Android File Manager application using Java + XML that can be built into app-debug.apk.
