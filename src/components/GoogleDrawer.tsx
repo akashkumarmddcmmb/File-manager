@@ -13,13 +13,17 @@ import {
   ChevronRight, 
   Info,
   User,
-  LogIn
+  LogIn,
+  FileText,
+  Lock,
+  Bell
 } from 'lucide-react';
 import { TabType, Language, StorageBreakdown, UserAccount } from '../types';
 import { GoogleFilesLogo } from './GoogleFilesLogo';
 import { formatBytes } from '../utils/storage';
 import { translations } from '../utils/translations';
 import { GoogleLogoIcon, MicrosoftLogoIcon } from './AccountModal';
+import { APP_INFO } from '../constants/appInfo';
 
 interface GoogleDrawerProps {
   isOpen: boolean;
@@ -32,7 +36,12 @@ interface GoogleDrawerProps {
   onOpenSafeFolder: () => void;
   onOpenTrash: () => void;
   onOpenStorageBreakdown: () => void;
+  onOpenSettings: () => void;
+  onOpenNotifications?: () => void;
+  activeNotificationCount?: number;
   onOpenAccount: () => void;
+  onOpenLegal?: (tab: 'privacy' | 'terms') => void;
+  onOpenFeedback?: () => void;
   userAccount?: UserAccount | null;
 }
 
@@ -47,7 +56,12 @@ export const GoogleDrawer: React.FC<GoogleDrawerProps> = ({
   onOpenSafeFolder,
   onOpenTrash,
   onOpenStorageBreakdown,
+  onOpenSettings,
+  onOpenNotifications,
+  activeNotificationCount = 0,
   onOpenAccount,
+  onOpenLegal,
+  onOpenFeedback,
   userAccount,
 }) => {
   const [showHelp, setShowHelp] = useState(false);
@@ -78,10 +92,10 @@ export const GoogleDrawer: React.FC<GoogleDrawerProps> = ({
                   {t.appName}
                 </span>
                 <span className="text-[11px] font-medium text-neutral-500 bg-neutral-100 px-1.5 py-0.2 rounded-md">
-                  by Google
+                  by Akash Kumar
                 </span>
               </div>
-              <p className="text-[11px] text-neutral-400">Version 1.0 (Official UI)</p>
+              <p className="text-[11px] text-neutral-400">Version {APP_INFO.version} (Official)</p>
             </div>
           </div>
           <button 
@@ -255,30 +269,85 @@ export const GoogleDrawer: React.FC<GoogleDrawerProps> = ({
             </span>
           </button>
 
+          {/* Notifications and Tasks */}
+          {onOpenNotifications && (
+            <button
+              onClick={() => {
+                onClose();
+                onOpenNotifications();
+              }}
+              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-3.5">
+                <Bell size={20} className="text-blue-600" />
+                <span>{language === 'hi' ? 'सूचनाएं व सक्रिय कार्य' : 'Notifications & Tasks'}</span>
+              </div>
+              {activeNotificationCount > 0 && (
+                <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-700 animate-pulse">
+                  {activeNotificationCount}
+                </span>
+              )}
+            </button>
+          )}
+
           <button
             onClick={() => {
               onClose();
-              onOpenStorageBreakdown();
+              onOpenSettings();
             }}
             className="w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
           >
             <Settings size={20} className="text-neutral-500" />
-            <span>Settings</span>
+            <span>{t.settings}</span>
           </button>
 
           <button
-            onClick={() => setShowHelp(prev => !prev)}
+            onClick={() => {
+              onClose();
+              if (onOpenLegal) onOpenLegal('privacy');
+            }}
             className="w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
           >
-            <HelpCircle size={20} className="text-neutral-500" />
-            <span>Help & feedback</span>
+            <ShieldCheck size={20} className="text-emerald-600" />
+            <span>{language === 'hi' ? 'गोपनीयता नीति (Privacy Policy)' : 'Privacy Policy'}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              onClose();
+              if (onOpenLegal) onOpenLegal('terms');
+            }}
+            className="w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
+          >
+            <FileText size={20} className="text-blue-600" />
+            <span>{language === 'hi' ? 'नियम और शर्तें (Terms of Service)' : 'Terms of Service'}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (onOpenFeedback) {
+                onClose();
+                onOpenFeedback();
+              } else {
+                setShowHelp(prev => !prev);
+              }
+            }}
+            className="w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
+          >
+            <HelpCircle size={20} className="text-blue-600" />
+            <div className="flex flex-col text-left">
+              <span>{t.feedback || 'Help & feedback'}</span>
+              <span className="text-[10px] text-neutral-400 font-normal">
+                {language === 'hi' ? 'डेवलपर आकाश कुमार को फ़ीडबैक भेजें' : 'Send feedback to developer'}
+              </span>
+            </div>
           </button>
 
           {showHelp && (
             <div className="mx-3 my-2 p-3 bg-blue-50 border border-blue-200/80 rounded-xl text-xs text-blue-900 animate-in fade-in duration-150">
               <div className="flex items-center gap-1.5 font-semibold text-blue-950 mb-1">
                 <Info size={14} className="text-blue-600" />
-                <span>Google Files v2.4 (Offline)</span>
+                <span>{APP_INFO.fullVersionString} (Official)</span>
               </div>
               <p className="text-[11px] text-blue-800 leading-relaxed">
                 Full offline file manager with Storage Cleaning, Internal & SD Card Explorer, MP3 Music Player, Video Player, PDF Reader, High-Speed Transfers, and Cloud Account Sync.
@@ -289,7 +358,7 @@ export const GoogleDrawer: React.FC<GoogleDrawerProps> = ({
 
         {/* Footer info */}
         <div className="p-4 border-t border-neutral-100 bg-[#f8fafd] text-[11px] text-neutral-400 text-center">
-          Google LLC • Offline Edition
+          {APP_INFO.developer} • {APP_INFO.version} ({APP_INFO.edition})
         </div>
       </div>
     </div>

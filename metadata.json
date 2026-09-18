@@ -1,6 +1,6 @@
 {
-  "name": "Files - Google File Manager",
-  "description": "A Google Files-inspired file manager with storage cleaner, category browsing, internal storage & SD card explorer, copy/move with real-time MBPS transfer speed meter and speed controls, file previews, and quick share.",
+  "name": "Files by Akash Kumar",
+  "description": "A powerful and fast file manager by Akash Kumar with storage cleaner, category browsing, internal storage & SD card explorer, high-speed transfer meter, archive extractor, and secure vault.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -45,6 +45,8 @@ interface BrowseTabProps {
   onShowInfo: (file: FileItem) => void;
   onCopyTo?: (file: FileItem) => void;
   onMoveTo?: (file: FileItem) => void;
+  hasDemoFiles?: boolean;
+  onClearDemoFiles?: () => void;
 }
 
 export const BrowseTab: React.FC<BrowseTabProps> = ({
@@ -70,6 +72,8 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
   onShowInfo,
   onCopyTo,
   onMoveTo,
+  hasDemoFiles = false,
+  onClearDemoFiles,
 }) => {
   const t = translations[language];
 
@@ -154,6 +158,36 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
 
   return (
     <div className="space-y-6 pb-24 pt-2">
+      {/* Optional Demo Files Notification Banner */}
+      {hasDemoFiles && onClearDemoFiles && (
+        <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+              <HardDrive size={16} />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-amber-900">
+                  {language === 'hi' ? 'डेमो फ़ाइलें लोड हैं' : 'Sample Demo Files Active'}
+                </span>
+                <span className="px-1.5 py-0.2 text-[9px] font-bold rounded-md bg-amber-200 text-amber-900">
+                  DEMO
+                </span>
+              </div>
+              <div className="text-[11px] text-amber-700 leading-tight mt-0.5">
+                {language === 'hi' ? 'इंस्टॉल के बाद असली उपयोग के लिए डेमो फ़ाइलें हटाएं' : 'Remove sample files to start with clean real storage'}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClearDemoFiles}
+            className="px-3 py-1.5 text-xs font-bold rounded-xl bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition-colors shrink-0 cursor-pointer"
+          >
+            {language === 'hi' ? 'फ़ाइलें हटाएं' : 'Clear Demo'}
+          </button>
+        </div>
+      )}
+
       {/* 1. Recent Files Section (Horizontal Carousel) */}
       {recentFiles.length > 0 && (
         <section className="space-y-2.5">
@@ -327,7 +361,7 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
               <p className="text-xs text-neutral-600 mt-1 leading-relaxed">
                 {language === 'hi'
                   ? 'आपके डिवाइस की इंटरनल मेमोरी और मेमोरी कार्ड (SD Card) को एक्सेस करने के लिए Android की "All Files Access" अनुमति देना आवश्यक है।'
-                  : 'Grant All Files Access so Google Files can display your songs, videos, documents and SD card files.'}
+                  : 'Grant All Files Access so Files by Akash Kumar can display your songs, videos, documents and SD card files.'}
               </p>
               {onRequestPermissions && (
                 <button

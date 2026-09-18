@@ -10,7 +10,7 @@ export const GoogleFilesLogo: React.FC<GoogleFilesLogoProps> = ({ size = 28, cla
     <div 
       style={{ width: size, height: size }}
       className={`relative flex items-center justify-center shrink-0 select-none ${className}`}
-      title="Google Files"
+      title="Files by Akash Kumar"
     >
       <svg
         width={size}

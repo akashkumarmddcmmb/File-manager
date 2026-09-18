@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -16,6 +17,7 @@ import android.os.storage.StorageVolume;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.webkit.MimeTypeMap;
+
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
@@ -29,10 +31,12 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import android.media.MediaScannerConnection;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @CapacitorPlugin(name = "RealDeviceStorage")
 public class RealDeviceStoragePlugin extends Plugin {
@@ -74,7 +78,7 @@ public class RealDeviceStoragePlugin extends Plugin {
                 return;
             }
         } else {
-            // For Android 10 and below, request normal permissions
+            // Android 10 and below: request legacy permissions
             if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                 getActivity().requestPermissions(new String[]{
                         Manifest.permission.READ_EXTERNAL_STORAGE,
@@ -115,92 +119,41 @@ public class RealDeviceStoragePlugin extends Plugin {
         internalObj.put("usedBytes", Math.max(0, intTotal - intFree));
         result.put("internal", internalObj);
 
-        // 2. Detect SD Card using StorageManager (Official Android API)
+        // 2. SD Card / Removable Media Detection
         JSObject sdObj = null;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            try {
-                StorageManager sm = (StorageManager) getContext().getSystemService(Context.STORAGE_SERVICE);
-                if (sm != null) {
-                    List<StorageVolume> volumes = sm.getStorageVolumes();
-                    for (StorageVolume vol : volumes) {
-                        if (vol.isRemovable()) {
-                            File dir = null;
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                                dir = vol.getDirectory();
-                            }
-                            if (dir == null) {
-                                String uuid = vol.getUuid();
-                                if (uuid != null) {
-                                    File test = new File("/storage/" + uuid);
-                                    if (test.exists()) dir = test;
-                                }
-                            }
-                            if (dir != null && dir.exists()) {
-                                long sdTotal = 0;
-                                long sdFree = 0;
-                                try {
-                                    StatFs stat = new StatFs(dir.getAbsolutePath());
-                                    sdTotal = stat.getTotalBytes();
-                                    sdFree = stat.getAvailableBytes();
-                                } catch (Exception e) {
-                                    sdTotal = dir.getTotalSpace();
-                                    sdFree = dir.getFreeSpace();
-                                }
-                                String desc = vol.getDescription(getContext());
-                                if (desc == null || desc.isEmpty()) {
-                                    desc = "SD Card (" + dir.getName() + ")";
-                                }
-                                sdObj = new JSObject();
-                                sdObj.put("name", desc);
-                                sdObj.put("path", dir.getAbsolutePath());
-                                sdObj.put("totalBytes", sdTotal);
-                                sdObj.put("freeBytes", sdFree);
-                                sdObj.put("usedBytes", Math.max(0, sdTotal - sdFree));
-                                break;
-                            }
+            StorageManager sm = (StorageManager) getContext().getSystemService(Context.STORAGE_SERVICE);
+            if (sm != null) {
+                List<StorageVolume> volumes = sm.getStorageVolumes();
+                for (StorageVolume vol : volumes) {
+                    if (vol.isRemovable()) {
+                        String volPath = null;
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            File f = vol.getDirectory();
+                            if (f != null) volPath = f.getAbsolutePath();
                         }
-                    }
-                }
-            } catch (Exception ignored) {}
-        }
+                        if (volPath == null) {
+                            String desc = vol.getDescription(getContext());
+                            volPath = "/storage/" + (desc != null ? desc : "sdcard");
+                        }
 
-        // Fallback 1: getExternalFilesDirs check
-        if (sdObj == null) {
-            File[] externalFilesDirs = getContext().getExternalFilesDirs(null);
-            if (externalFilesDirs != null) {
-                for (File ext : externalFilesDirs) {
-                    if (ext != null) {
-                        String fullPath = ext.getAbsolutePath();
-                        if (!fullPath.startsWith(internalPath)) {
-                            int androidIdx = fullPath.indexOf("/Android");
-                            String sdRoot = (androidIdx != -1) ? fullPath.substring(0, androidIdx) : fullPath;
-                            File sdFile = new File(sdRoot);
-                            if (sdFile.exists()) {
-                                long sdTotal = 0;
-                                long sdFree = 0;
-                                try {
-                                    StatFs stat = new StatFs(sdRoot);
-                                    sdTotal = stat.getTotalBytes();
-                                    sdFree = stat.getAvailableBytes();
-                                } catch (Exception ignored) {
-                                    sdTotal = sdFile.getTotalSpace();
-                                    sdFree = sdFile.getFreeSpace();
-                                }
-                                sdObj = new JSObject();
-                                sdObj.put("name", "SD Card (" + sdFile.getName() + ")");
-                                sdObj.put("path", sdRoot);
-                                sdObj.put("totalBytes", sdTotal);
-                                sdObj.put("freeBytes", sdFree);
-                                sdObj.put("usedBytes", Math.max(0, sdTotal - sdFree));
-                                break;
-                            }
-                        }
+                        File sdDir = new File(volPath);
+                        long sdTotal = sdDir.getTotalSpace();
+                        long sdFree = sdDir.getFreeSpace();
+
+                        sdObj = new JSObject();
+                        sdObj.put("name", vol.getDescription(getContext()) != null ? vol.getDescription(getContext()) : "SD Card");
+                        sdObj.put("path", volPath);
+                        sdObj.put("totalBytes", sdTotal);
+                        sdObj.put("freeBytes", sdFree);
+                        sdObj.put("usedBytes", Math.max(0, sdTotal - sdFree));
+                        break;
                     }
                 }
             }
         }
 
-        // Fallback 2: Check /storage directly for removable media
+        // Fallback: Check /storage directly for mounted removable media
         if (sdObj == null) {
             File storageDir = new File("/storage");
             if (storageDir.exists() && storageDir.isDirectory()) {
@@ -208,7 +161,7 @@ public class RealDeviceStoragePlugin extends Plugin {
                 if (list != null) {
                     for (File f : list) {
                         String name = f.getName();
-                        if (!name.equalsIgnoreCase("emulated") && !name.equalsIgnoreCase("self")) {
+                        if (!name.equalsIgnoreCase("emulated") && !name.equalsIgnoreCase("self") && !name.equalsIgnoreCase("knox-emulated")) {
                             long sdTotal = f.getTotalSpace();
                             long sdFree = f.getFreeSpace();
                             if (sdTotal > 0) {
@@ -236,6 +189,9 @@ public class RealDeviceStoragePlugin extends Plugin {
         if (path == null || path.isEmpty()) {
             path = Environment.getExternalStorageDirectory().getAbsolutePath();
         }
+
+        // Sanitize path against directory traversal
+        path = sanitizePath(path);
 
         File dir = new File(path);
         JSObject result = new JSObject();
@@ -292,31 +248,46 @@ public class RealDeviceStoragePlugin extends Plugin {
     public void scanMediaCategory(PluginCall call) {
         String category = call.getString("category", "all");
         JSArray filesArray = new JSArray();
+        Set<String> visitedPaths = new HashSet<>();
 
         ContentResolver resolver = getContext().getContentResolver();
+        File extDir = Environment.getExternalStorageDirectory();
 
         if (category.equals("audio") || category.equals("all")) {
-            queryMediaStore(resolver, MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, filesArray, "audio");
-            // Physically scan Music & Audio folders across Internal & SD Card
-            scanAudioFolders(filesArray);
+            queryMediaStoreRobust(resolver, MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, filesArray, "audio", visitedPaths);
+            scanPhysicalFolder(new File(extDir, "Music"), filesArray, "audio", 4, visitedPaths);
+            scanPhysicalFolder(new File(extDir, "Download"), filesArray, "audio", 3, visitedPaths);
+            scanPhysicalFolder(new File(extDir, "Ringtones"), filesArray, "audio", 2, visitedPaths);
+            scanPhysicalFolder(new File(extDir, "Podcasts"), filesArray, "audio", 2, visitedPaths);
+            scanPhysicalFolder(new File(extDir, "Recordings"), filesArray, "audio", 3, visitedPaths);
+            scanSdCardFolders(filesArray, "audio", visitedPaths);
         }
+
         if (category.equals("images") || category.equals("all")) {
-            queryMediaStore(resolver, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, filesArray, "image");
-            scanPhysicalFolder(new File(Environment.getExternalStorageDirectory(), "Pictures"), filesArray, "images", 3);
-            scanPhysicalFolder(new File(Environment.getExternalStorageDirectory(), "DCIM"), filesArray, "images", 3);
+            queryMediaStoreRobust(resolver, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, filesArray, "image", visitedPaths);
+            scanPhysicalFolder(new File(extDir, "DCIM"), filesArray, "images", 4, visitedPaths);
+            scanPhysicalFolder(new File(extDir, "Pictures"), filesArray, "images", 4, visitedPaths);
+            scanPhysicalFolder(new File(extDir, "Download"), filesArray, "images", 3, visitedPaths);
+            scanSdCardFolders(filesArray, "images", visitedPaths);
         }
+
         if (category.equals("videos") || category.equals("all")) {
-            queryMediaStore(resolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI, filesArray, "video");
-            scanPhysicalFolder(new File(Environment.getExternalStorageDirectory(), "Movies"), filesArray, "videos", 3);
-            scanPhysicalFolder(new File(new File(Environment.getExternalStorageDirectory(), "DCIM"), "Camera"), filesArray, "videos", 2);
+            queryMediaStoreRobust(resolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI, filesArray, "video", visitedPaths);
+            scanPhysicalFolder(new File(extDir, "Movies"), filesArray, "videos", 4, visitedPaths);
+            scanPhysicalFolder(new File(new File(extDir, "DCIM"), "Camera"), filesArray, "videos", 3, visitedPaths);
+            scanPhysicalFolder(new File(extDir, "Download"), filesArray, "videos", 3, visitedPaths);
+            scanSdCardFolders(filesArray, "videos", visitedPaths);
         }
-        if (category.equals("downloads") || category.equals("documents") || category.equals("apps") || category.equals("all")) {
+
+        if (category.equals("documents") || category.equals("apps") || category.equals("downloads") || category.equals("all")) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                queryMediaStore(resolver, MediaStore.Downloads.EXTERNAL_CONTENT_URI, filesArray, "download");
+                queryMediaStoreRobust(resolver, MediaStore.Downloads.EXTERNAL_CONTENT_URI, filesArray, "download", visitedPaths);
             }
-            // Scan real Download and Documents folder directly
-            scanPhysicalFolder(new File(Environment.getExternalStorageDirectory(), "Download"), filesArray, category, 2);
-            scanPhysicalFolder(new File(Environment.getExternalStorageDirectory(), "Documents"), filesArray, category, 2);
+            scanPhysicalFolder(new File(extDir, "Download"), filesArray, category, 3, visitedPaths);
+            scanPhysicalFolder(new File(extDir, "Documents"), filesArray, category, 4, visitedPaths);
+            scanPhysicalFolder(new File(extDir, "Documents"), filesArray, "apps", 4, visitedPaths);
+            scanPhysicalFolder(new File(extDir, "Download"), filesArray, "apps", 3, visitedPaths);
+            scanSdCardFolders(filesArray, category, visitedPaths);
         }
 
         JSObject res = new JSObject();
@@ -324,71 +295,82 @@ public class RealDeviceStoragePlugin extends Plugin {
         call.resolve(res);
     }
 
-    private void scanAudioFolders(JSArray output) {
-        // 1. Internal Storage Audio & Music Folders
-        File extDir = Environment.getExternalStorageDirectory();
-        scanPhysicalFolder(new File(extDir, "Music"), output, "audio", 3);
-        scanPhysicalFolder(new File(extDir, "Download"), output, "audio", 2);
-        scanPhysicalFolder(new File(extDir, "Ringtones"), output, "audio", 2);
-        scanPhysicalFolder(new File(extDir, "Podcasts"), output, "audio", 2);
-        scanPhysicalFolder(new File(extDir, "Recordings"), output, "audio", 2);
-
-        // 2. SD Card Audio & Music Folders
+    private void scanSdCardFolders(JSArray output, String category, Set<String> visited) {
         File storageDir = new File("/storage");
         if (storageDir.exists() && storageDir.isDirectory()) {
             File[] roots = storageDir.listFiles();
             if (roots != null) {
                 for (File root : roots) {
                     if (!root.getName().equalsIgnoreCase("emulated") && !root.getName().equalsIgnoreCase("self")) {
-                        scanPhysicalFolder(new File(root, "Music"), output, "audio", 3);
-                        scanPhysicalFolder(new File(root, "Download"), output, "audio", 2);
-                        scanPhysicalFolder(new File(root, "Songs"), output, "audio", 3);
-                        scanPhysicalFolder(root, output, "audio", 1);
+                        scanPhysicalFolder(root, output, category, 3, visited);
                     }
                 }
             }
         }
     }
 
-    private void queryMediaStore(ContentResolver resolver, Uri uri, JSArray output, String defaultType) {
+    /**
+     * Queries MediaStore with modern Android 10+ (Scoped Storage / Relative Path) fallback
+     * without relying exclusively on deprecated MediaStore.DATA column.
+     */
+    private void queryMediaStoreRobust(ContentResolver resolver, Uri uri, JSArray output, String defaultType, Set<String> visited) {
         try {
-            String[] projection = {
-                    MediaStore.MediaColumns._ID,
-                    MediaStore.MediaColumns.DISPLAY_NAME,
-                    MediaStore.MediaColumns.DATA,
-                    MediaStore.MediaColumns.SIZE,
-                    MediaStore.MediaColumns.DATE_MODIFIED,
-                    MediaStore.MediaColumns.MIME_TYPE
-            };
+            List<String> projectionList = new ArrayList<>();
+            projectionList.add(MediaStore.MediaColumns._ID);
+            projectionList.add(MediaStore.MediaColumns.DISPLAY_NAME);
+            projectionList.add(MediaStore.MediaColumns.SIZE);
+            projectionList.add(MediaStore.MediaColumns.DATE_MODIFIED);
+            projectionList.add(MediaStore.MediaColumns.MIME_TYPE);
 
-            Cursor cursor = resolver.query(uri, projection, null, null, MediaStore.MediaColumns.DATE_MODIFIED + " DESC LIMIT 300");
+            // Add DATA column if available
+            projectionList.add(MediaStore.MediaColumns.DATA);
+
+            // Add RELATIVE_PATH on Android 10+ (API 29+)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                projectionList.add(MediaStore.MediaColumns.RELATIVE_PATH);
+            }
+
+            String[] projection = projectionList.toArray(new String[0]);
+            Cursor cursor = resolver.query(uri, projection, null, null, MediaStore.MediaColumns.DATE_MODIFIED + " DESC LIMIT 500");
+
             if (cursor != null) {
                 int idIdx = cursor.getColumnIndex(MediaStore.MediaColumns._ID);
                 int nameIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME);
-                int dataIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DATA);
                 int sizeIdx = cursor.getColumnIndex(MediaStore.MediaColumns.SIZE);
                 int modIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DATE_MODIFIED);
                 int mimeIdx = cursor.getColumnIndex(MediaStore.MediaColumns.MIME_TYPE);
+                int dataIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DATA);
+                int relPathIdx = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ? cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH) : -1;
 
                 while (cursor.moveToNext()) {
+                    long id = (idIdx != -1) ? cursor.getLong(idIdx) : -1;
                     String name = (nameIdx != -1) ? cursor.getString(nameIdx) : null;
                     String dataPath = (dataIdx != -1) ? cursor.getString(dataIdx) : null;
                     long size = (sizeIdx != -1) ? cursor.getLong(sizeIdx) : 0;
                     long modified = (modIdx != -1) ? cursor.getLong(modIdx) * 1000 : System.currentTimeMillis();
                     String mime = (mimeIdx != -1) ? cursor.getString(mimeIdx) : null;
+                    String relPath = (relPathIdx != -1) ? cursor.getString(relPathIdx) : null;
 
-                    if (name == null && dataPath != null) {
-                        name = new File(dataPath).getName();
+                    // Fallback to construct path if DATA is missing or null (Android 10+)
+                    if (dataPath == null || dataPath.isEmpty()) {
+                        if (relPath != null && name != null) {
+                            dataPath = new File(Environment.getExternalStorageDirectory(), relPath + name).getAbsolutePath();
+                        } else if (id != -1) {
+                            dataPath = ContentUris.withAppendedId(uri, id).toString();
+                        }
+                    }
+
+                    if (dataPath == null || visited.contains(dataPath)) continue;
+                    visited.add(dataPath);
+
+                    if (name == null && dataPath.contains("/")) {
+                        name = dataPath.substring(dataPath.lastIndexOf("/") + 1);
                     }
                     if (name == null || size <= 0) continue;
 
-                    if (dataPath == null && idIdx != -1) {
-                        long id = cursor.getLong(idIdx);
-                        dataPath = ContentUris.withAppendedId(uri, id).toString();
-                    }
-                    if (dataPath == null) continue;
-
                     boolean isSd = !dataPath.contains("emulated") && dataPath.startsWith("/storage/");
+                    String ext = getFileExtension(name);
+                    String categoryType = getCategoryType(ext);
 
                     JSObject item = new JSObject();
                     item.put("id", "media-" + dataPath.hashCode());
@@ -397,9 +379,8 @@ public class RealDeviceStoragePlugin extends Plugin {
                     item.put("size", size);
                     item.put("lastModified", modified);
                     item.put("mimeType", mime != null ? mime : getMimeType(name));
-                    String ext = getFileExtension(name);
                     item.put("extension", ext);
-                    item.put("type", getCategoryType(ext));
+                    item.put("type", categoryType);
                     item.put("storageDevice", isSd ? "sdcard" : "internal");
                     item.put("folder", dataPath.contains("/") ? dataPath.substring(0, dataPath.lastIndexOf("/")) : "");
                     output.put(item);
@@ -407,11 +388,11 @@ public class RealDeviceStoragePlugin extends Plugin {
                 cursor.close();
             }
         } catch (Exception e) {
-            // Log and continue gracefully
+            // Gracefully ignore and rely on physical folder scan
         }
     }
 
-    private void scanPhysicalFolder(File folder, JSArray output, String filterCategory, int depth) {
+    private void scanPhysicalFolder(File folder, JSArray output, String filterCategory, int depth, Set<String> visited) {
         if (depth < 0 || folder == null || !folder.exists() || !folder.isDirectory()) return;
         File[] files = folder.listFiles();
         if (files == null) return;
@@ -419,34 +400,38 @@ public class RealDeviceStoragePlugin extends Plugin {
         for (File f : files) {
             if (f.getName().startsWith(".")) continue;
             if (f.isDirectory() && depth > 0) {
-                scanPhysicalFolder(f, output, filterCategory, depth - 1);
+                scanPhysicalFolder(f, output, filterCategory, depth - 1, visited);
             } else if (f.isFile()) {
+                String path = f.getAbsolutePath();
+                if (visited.contains(path)) continue;
+
                 String ext = getFileExtension(f.getName());
                 String type = getCategoryType(ext);
 
                 boolean include = false;
                 if (filterCategory.equals("all")) {
                     include = true;
-                } else if (filterCategory.equals("audio") && (type.equals("audio") || ext.equals("mp3") || ext.equals("m4a") || ext.equals("aac") || ext.equals("wav") || ext.equals("ogg") || ext.equals("flac") || ext.equals("opus"))) {
+                } else if (filterCategory.equals("audio") && type.equals("audio")) {
                     include = true;
                 } else if (filterCategory.equals("images") && type.equals("image")) {
                     include = true;
                 } else if (filterCategory.equals("videos") && type.equals("video")) {
                     include = true;
-                } else if (filterCategory.equals("apps") && ext.equals("apk")) {
+                } else if (filterCategory.equals("apps") && type.equals("apk")) {
                     include = true;
-                } else if (filterCategory.equals("documents") && (type.equals("document") || ext.equals("pdf"))) {
+                } else if (filterCategory.equals("documents") && (type.equals("document") || type.equals("archive"))) {
                     include = true;
                 } else if (filterCategory.equals("downloads")) {
                     include = true;
                 }
 
                 if (include) {
-                    boolean isSd = !f.getAbsolutePath().contains("emulated") && f.getAbsolutePath().startsWith("/storage/");
+                    visited.add(path);
+                    boolean isSd = !path.contains("emulated") && path.startsWith("/storage/");
                     JSObject item = new JSObject();
-                    item.put("id", "file-" + f.getAbsolutePath().hashCode());
+                    item.put("id", "file-" + path.hashCode());
                     item.put("name", f.getName());
-                    item.put("path", f.getAbsolutePath());
+                    item.put("path", path);
                     item.put("size", f.length());
                     item.put("lastModified", f.lastModified());
                     item.put("mimeType", getMimeType(f.getName()));
@@ -467,9 +452,22 @@ public class RealDeviceStoragePlugin extends Plugin {
             call.reject("Path required");
             return;
         }
+
+        path = sanitizePath(path);
+
         try {
             File dir = new File(path);
             boolean created = dir.exists() || dir.mkdirs();
+
+            if (created) {
+                MediaScannerConnection.scanFile(
+                        getContext(),
+                        new String[]{ dir.getAbsolutePath() },
+                        null,
+                        null
+                );
+            }
+
             JSObject res = new JSObject();
             res.put("success", created);
             res.put("path", dir.getAbsolutePath());
@@ -487,6 +485,10 @@ public class RealDeviceStoragePlugin extends Plugin {
             call.reject("sourcePath and targetFolderPath are required");
             return;
         }
+
+        sourcePath = sanitizePath(sourcePath);
+        targetFolderPath = sanitizePath(targetFolderPath);
+
         try {
             File src = new File(sourcePath);
             if (!src.exists()) {
@@ -506,7 +508,7 @@ public class RealDeviceStoragePlugin extends Plugin {
                 String ext = (dot > 0) ? name.substring(dot) : "";
                 int counter = 1;
                 while (dest.exists()) {
-                    dest = new File(targetDir, base + "_copy" + (counter > 1 ? "_" + counter : "") + ext);
+                    dest = new File(targetDir, base + " (" + counter + ")" + ext);
                     counter++;
                 }
             }
@@ -540,6 +542,10 @@ public class RealDeviceStoragePlugin extends Plugin {
             call.reject("sourcePath and targetFolderPath are required");
             return;
         }
+
+        sourcePath = sanitizePath(sourcePath);
+        targetFolderPath = sanitizePath(targetFolderPath);
+
         try {
             File src = new File(sourcePath);
             if (!src.exists()) {
@@ -559,7 +565,7 @@ public class RealDeviceStoragePlugin extends Plugin {
                 String ext = (dot > 0) ? name.substring(dot) : "";
                 int counter = 1;
                 while (dest.exists()) {
-                    dest = new File(targetDir, base + "_copy" + (counter > 1 ? "_" + counter : "") + ext);
+                    dest = new File(targetDir, base + " (" + counter + ")" + ext);
                     counter++;
                 }
             }
@@ -581,6 +587,7 @@ public class RealDeviceStoragePlugin extends Plugin {
             res.put("success", true);
             res.put("newPath", dest.getAbsolutePath());
             res.put("name", dest.getName());
+            res.put("size", dest.length());
             call.resolve(res);
         } catch (Exception e) {
             call.reject("Failed to move file: " + e.getMessage());
@@ -607,12 +614,16 @@ public class RealDeviceStoragePlugin extends Plugin {
             call.reject("Path required");
             return;
         }
+        path = sanitizePath(path);
         File f = new File(path);
         if (!f.exists()) {
             call.reject("File does not exist");
             return;
         }
         boolean deleted = f.delete();
+        if (deleted) {
+            MediaScannerConnection.scanFile(getContext(), new String[]{ path }, null, null);
+        }
         JSObject res = new JSObject();
         res.put("success", deleted);
         call.resolve(res);
@@ -625,6 +636,7 @@ public class RealDeviceStoragePlugin extends Plugin {
             call.reject("Path required");
             return;
         }
+        path = sanitizePath(path);
 
         File file = new File(path);
         if (!file.exists()) {
@@ -641,16 +653,27 @@ public class RealDeviceStoragePlugin extends Plugin {
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
-            if (file.getName().toLowerCase().endsWith(".apk")) {
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            }
-
             getContext().startActivity(Intent.createChooser(intent, "Open with"));
             JSObject res = new JSObject();
             res.put("success", true);
             call.resolve(res);
         } catch (Exception e) {
             call.reject("Unable to open file: " + e.getMessage());
+        }
+    }
+
+    private String sanitizePath(String path) {
+        if (path == null) return "";
+        // If it's a relative path like "/Download", resolve to external storage directory
+        if (path.startsWith("/") && !path.startsWith("/storage/") && !path.startsWith("/sdcard") && !path.startsWith("/data/")) {
+            File root = Environment.getExternalStorageDirectory();
+            path = new File(root, path.substring(1)).getAbsolutePath();
+        }
+        // Normalize and resolve canonical structure
+        try {
+            return new File(path).getCanonicalPath();
+        } catch (Exception e) {
+            return new File(path).getAbsolutePath();
         }
     }
 
@@ -670,6 +693,7 @@ public class RealDeviceStoragePlugin extends Plugin {
         if (ext.equals("mp4")) return "video/mp4";
         if (ext.equals("mkv")) return "video/x-matroska";
         if (ext.equals("pdf")) return "application/pdf";
+        if (ext.equals("zip")) return "application/zip";
         String mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
         return mime != null ? mime : "application/octet-stream";
     }
@@ -685,7 +709,7 @@ public class RealDeviceStoragePlugin extends Plugin {
             return "video";
         }
         if (ext.equals("apk") || ext.equals("xapk")) {
-            return "app";
+            return "apk";
         }
         if (ext.equals("zip") || ext.equals("rar") || ext.equals("7z") || ext.equals("tar") || ext.equals("gz")) {
             return "archive";

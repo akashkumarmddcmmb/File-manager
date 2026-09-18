@@ -244,7 +244,7 @@ export const ShareTab: React.FC<ShareTabProps> = ({ files, language, onAddReceiv
     const urls = selectedFiles.map(f => f.url).filter(Boolean) as string[];
     const names = selectedFiles.map(f => f.name).join(', ');
     await shareNativeFile(
-      `${selectedFiles.length} files from Google Files`,
+      `${selectedFiles.length} files from Files by Akash Kumar`,
       `Files: ${names} (${formatBytes(selectedTotalBytes)})`,
       urls[0] || window.location.href,
       urls
@@ -802,7 +802,7 @@ export const ShareTab: React.FC<ShareTabProps> = ({ files, language, onAddReceiv
           </span>
           {language === 'hi'
             ? 'बिना मोबाइल डेटा खर्च किए फ़ाइलें एंड-टू-एंड एन्क्रिप्शन के साथ सीधे दूसरे डिवाइस में ट्रांसफर होती हैं।'
-            : 'Files are shared peer-to-peer with zero mobile data charges, encrypted locally like Google Files and Quick Share.'}
+            : 'Files are shared peer-to-peer with zero mobile data charges, encrypted locally like Files by Akash Kumar and Quick Share.'}
         </div>
       </div>
     </div>

@@ -42,6 +42,8 @@ interface AccountModalProps {
   onSignIn: (account: UserAccount) => void;
   onSignOut: () => void;
   onOpenStorageBreakdown: () => void;
+  onOpenLegal?: (tab: 'privacy' | 'terms') => void;
+  onOpenFeedback?: () => void;
   language: Language;
 }
 
@@ -53,6 +55,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   onSignIn,
   onSignOut,
   onOpenStorageBreakdown,
+  onOpenLegal,
+  onOpenFeedback,
   language,
 }) => {
   const [selectedProvider, setSelectedProvider] = useState<AuthProvider | null>(null);
@@ -287,6 +291,23 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 <ExternalLink size={14} className="text-neutral-400" />
               </button>
 
+              {onOpenFeedback && (
+                <button
+                  id="btn-account-feedback"
+                  onClick={() => {
+                    onClose();
+                    onOpenFeedback();
+                  }}
+                  className="w-full text-left px-3.5 py-2.5 bg-blue-50/70 hover:bg-blue-100/80 rounded-xl transition-colors font-semibold text-blue-800 flex items-center justify-between cursor-pointer border border-blue-200/70"
+                >
+                  <span className="flex items-center gap-2">
+                    <Sparkles size={15} className="text-blue-600" />
+                    <span>{language === 'hi' ? 'डेवलपर को फ़ीडबैक भेजें' : 'Send Developer Feedback'}</span>
+                  </span>
+                  <ChevronRight size={15} className="text-blue-500" />
+                </button>
+              )}
+
               <button
                 id="btn-sign-out"
                 onClick={handleSignOutClick}
@@ -374,10 +395,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 {selectedProvider === 'google' ? (
                   <button
                     type="button"
-                    onClick={() => handleQuickPresetSignIn('google', 'googleuser@gmail.com', 'Google User')}
+                    onClick={() => handleQuickPresetSignIn('google', 'akashkumarmddcmmb@gmail.com', 'Akash Kumar')}
                     className="w-full text-left p-2 rounded-lg bg-neutral-100 hover:bg-blue-50 text-neutral-700 hover:text-blue-700 text-xs font-medium flex items-center justify-between cursor-pointer border border-neutral-200/60"
                   >
-                    <span>googleuser@gmail.com</span>
+                    <span>Akash Kumar (akashkumarmddcmmb@gmail.com)</span>
                     <span className="text-[10px] text-blue-600 font-bold">Tap to use</span>
                   </button>
                 ) : (
@@ -481,10 +502,28 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         )}
 
         {/* Footer */}
-        <div className="mt-5 pt-3 border-t border-neutral-100 flex items-center justify-center gap-4 text-[11px] text-neutral-400">
-          <span>Privacy Policy</span>
+        <div className="mt-5 pt-3 border-t border-neutral-100 flex items-center justify-center gap-4 text-[11px] text-neutral-500">
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              if (onOpenLegal) onOpenLegal('privacy');
+            }}
+            className="hover:text-blue-600 transition-colors cursor-pointer hover:underline"
+          >
+            {language === 'hi' ? 'गोपनीयता नीति (Privacy Policy)' : 'Privacy Policy'}
+          </button>
           <span>•</span>
-          <span>Terms of Service</span>
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              if (onOpenLegal) onOpenLegal('terms');
+            }}
+            className="hover:text-blue-600 transition-colors cursor-pointer hover:underline"
+          >
+            {language === 'hi' ? 'उपयोग की शर्तें (Terms of Service)' : 'Terms of Service'}
+          </button>
         </div>
       </div>
     </div>

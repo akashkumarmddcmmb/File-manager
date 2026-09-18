@@ -149,7 +149,7 @@ export const initialFiles: FileItem[] = [
   // Documents
   {
     id: 'doc-1',
-    name: 'Resume_Software_Engineer_2026.pdf',
+    name: 'Resume_Akash_Kumar_Engineer_2026.pdf',
     size: 1450000, // 1.45 MB
     type: 'document',
     mimeType: 'application/pdf',
@@ -157,7 +157,7 @@ export const initialFiles: FileItem[] = [
     createdAt: '2026-09-02T15:20:00Z',
     updatedAt: '2026-09-02T15:20:00Z',
     thumbnail: 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=300&auto=format&fit=crop&q=60',
-    content: `# Curriculum Vitae\n\n**Candidate:** Full-Stack & Mobile Developer\n**Location:** New Delhi, India\n\n### Summary\nExperienced developer specializing in React, TypeScript, Android and Cloud architectures.\n\n### Skills\n- Frontend: React 19, TypeScript, Tailwind CSS, Material 3\n- Mobile: Android, Files by Google Architecture, Offline Sync\n- Backend: Node.js, Express, SQLite, Cloud APIs\n\n### Projects\n- **Google Files App**: High fidelity file manager with storage cleaner, nearby sharing, category filters, and safe vault.`,
+    content: `# Curriculum Vitae\n\n**Candidate:** Akash Kumar (Full-Stack & Mobile Developer)\n**Email:** akashkumarmddcmmb@gmail.com\n\n### Summary\nExperienced developer specializing in React, TypeScript, Android and Cloud architectures.\n\n### Skills\n- Frontend: React 19, TypeScript, Tailwind CSS, Material 3\n- Mobile: Android, Native Architecture, Offline Sync\n- Backend: Node.js, Express, SQLite, Cloud APIs\n\n### Projects\n- **Files by Akash Kumar**: High fidelity file manager with storage cleaner, nearby sharing, category filters, and safe vault.`,
     isStarred: true,
   },
   {
@@ -174,7 +174,7 @@ export const initialFiles: FileItem[] = [
   },
   {
     id: 'doc-3',
-    name: 'Meeting_Notes_Google_Files_Feature.txt',
+    name: 'Meeting_Notes_Files_Features.txt',
     size: 45000,
     type: 'document',
     mimeType: 'text/plain',
@@ -182,11 +182,11 @@ export const initialFiles: FileItem[] = [
     createdAt: '2026-09-03T17:00:00Z',
     updatedAt: '2026-09-03T17:00:00Z',
     thumbnail: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=300&auto=format&fit=crop&q=60',
-    content: `Google File Manager Features Checklist:\n1. Clean tab with Junk cache removal\n2. Duplicate file detector\n3. Category view (Downloads, Images, Videos, Audio, Documents, Apps)\n4. Starred collections\n5. Safe Folder protected with 4-digit PIN\n6. Internal Storage folder browser\n7. Multi-select and batch actions\n8. Nearby Share simulator`,
+    content: `Files by Akash Kumar - Features Checklist:\n1. Clean tab with Junk cache removal\n2. Duplicate file detector\n3. Category view (Downloads, Images, Videos, Audio, Documents, Apps)\n4. Starred collections\n5. Safe Folder protected with 4-digit PIN\n6. Internal Storage folder browser\n7. Multi-select and batch actions\n8. Nearby Quick Share simulator`,
   },
   {
     id: 'doc-3-copy',
-    name: 'Meeting_Notes_Google_Files_Feature (Copy).txt',
+    name: 'Meeting_Notes_Files_Features (Copy).txt',
     size: 45000,
     type: 'document',
     mimeType: 'text/plain',
@@ -194,7 +194,7 @@ export const initialFiles: FileItem[] = [
     createdAt: '2026-09-03T17:05:00Z',
     updatedAt: '2026-09-03T17:05:00Z',
     thumbnail: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=300&auto=format&fit=crop&q=60',
-    content: `Google File Manager Features Checklist:\n1. Clean tab with Junk cache removal\n2. Duplicate file detector\n3. Category view (Downloads, Images, Videos, Audio, Documents, Apps)\n4. Starred collections\n5. Safe Folder protected with 4-digit PIN\n6. Internal Storage folder browser\n7. Multi-select and batch actions\n8. Nearby Share simulator`,
+    content: `Files by Akash Kumar - Features Checklist:\n1. Clean tab with Junk cache removal\n2. Duplicate file detector\n3. Category view (Downloads, Images, Videos, Audio, Documents, Apps)\n4. Starred collections\n5. Safe Folder protected with 4-digit PIN\n6. Internal Storage folder browser\n7. Multi-select and batch actions\n8. Nearby Quick Share simulator`,
     isDuplicate: true,
     duplicateGroup: 'dup-notes',
   },

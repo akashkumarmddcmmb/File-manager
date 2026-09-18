@@ -191,7 +191,7 @@ export const PdfDocumentViewerModal: React.FC<PdfDocumentViewerModalProps> = ({
                   </h3>
                   <p className="text-xs text-neutral-400">
                     {language === 'hi' 
-                      ? 'इस PDF को अपने फ़ोन के Adobe Acrobat, Google PDF Viewer, या Drive में खोलें।' 
+                      ? 'इस PDF को अपने फ़ोन के डिफॉल्ट PDF रीडर या व्यूअर में खोलें।' 
                       : 'Open this PDF document with your device default reader.'}
                   </p>
                   {file.url && (

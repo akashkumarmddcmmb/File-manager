@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  Menu,
+  Menu, 
   Search, 
   X, 
   Grid, 
@@ -10,7 +10,8 @@ import {
   HardDrive,
   MoreVertical,
   User,
-  ShieldCheck
+  ShieldCheck,
+  Bell
 } from 'lucide-react';
 import { ViewMode, SortOption, Language, UserAccount } from '../types';
 import { translations } from '../utils/translations';
@@ -31,6 +32,8 @@ interface HeaderProps {
   onOpenStorageBreakdown: () => void;
   onOpenDrawer: () => void;
   onOpenAccount: () => void;
+  onOpenNotifications?: () => void;
+  activeNotificationCount?: number;
   userAccount?: UserAccount | null;
 }
 
@@ -46,6 +49,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenStorageBreakdown,
   onOpenDrawer,
   onOpenAccount,
+  onOpenNotifications,
+  activeNotificationCount = 0,
   userAccount,
 }) => {
   const [showSortMenu, setShowSortMenu] = useState(false);
@@ -96,6 +101,23 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Action Icons in Search Bar */}
           <div className="flex items-center gap-1 shrink-0">
+            {/* Notification Shade Bell Button */}
+            {onOpenNotifications && (
+              <button
+                id="btn-notifications-toggle"
+                onClick={onOpenNotifications}
+                title="Notifications & Tasks"
+                className="relative p-1.5 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors cursor-pointer"
+              >
+                <Bell size={18} />
+                {activeNotificationCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center animate-pulse shadow-xs">
+                    {activeNotificationCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             {/* View Mode Toggle (Grid/List) */}
             <button
               id="btn-view-mode-toggle"

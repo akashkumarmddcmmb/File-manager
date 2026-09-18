@@ -109,7 +109,7 @@ export async function shareNativeFile(
         text,
         url: url && !url.startsWith('blob:') && !url.startsWith('data:') ? url : undefined,
         files: files && files.length > 0 ? files : (url && url.startsWith('file://') ? [url] : undefined),
-        dialogTitle: 'Google Files - Share',
+        dialogTitle: 'Files by Akash Kumar - Share',
       });
       return true;
     }

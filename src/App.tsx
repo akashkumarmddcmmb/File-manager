@@ -35,11 +35,19 @@ import { TransferModal } from './components/TransferModal';
 import { CopyMoveDestinationModal } from './components/CopyMoveDestinationModal';
 import { GoogleDrawer } from './components/GoogleDrawer';
 import { AccountModal } from './components/AccountModal';
+import { SettingsModal } from './components/SettingsModal';
 import { ArchiveExtractorModal } from './components/ArchiveExtractorModal';
 import { ZipCompressModal } from './components/ZipCompressModal';
+import { LegalModal } from './components/LegalModal';
+import { FeedbackModal } from './components/FeedbackModal';
+import { NotificationShade } from './components/NotificationShade';
+import { FloatingNotificationBar } from './components/FloatingNotificationBar';
 import { FileItemCard } from './components/FileItemCard';
 import { translations } from './utils/translations';
 import { isArchiveFile } from './utils/archiveUtils';
+import { formatBytes } from './utils/storage';
+import { isDemoFile, filterOutDemoFiles, hasDemoFiles, STORAGE_HIDE_DEMO_KEY } from './utils/demoData';
+import { AppNotification } from './types';
 import { UploadCloud, CheckCircle2, ClipboardPaste, X } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -50,22 +58,30 @@ import {
   requestAllFilesAccess, 
   StorageVolumeInfo,
   openRealFile,
+  createNativeFolder,
   copyNativeFile,
   moveNativeFile,
   triggerHapticFeedback
 } from './utils/nativeStorage';
+import { saveFileBlob } from './utils/idbStorage';
 
 const STORAGE_FILES_KEY = 'google_files_app_files_v1';
 const STORAGE_FOLDERS_KEY = 'google_files_app_folders_v1';
 const STORAGE_JUNK_KEY = 'google_files_app_junk_v1';
 
 export default function App() {
-  // 1. Files & Folders state with LocalStorage persistence
+  // 1. Files & Folders state with LocalStorage persistence & clean native mode support
   const [files, setFiles] = useState<FileItem[]>(() => {
     try {
+      const isNative = Capacitor.isNativePlatform();
+      const hideDemo = localStorage.getItem(STORAGE_HIDE_DEMO_KEY) === 'true';
+
       const saved = localStorage.getItem(STORAGE_FILES_KEY);
       if (saved) {
         const parsed: FileItem[] = JSON.parse(saved);
+        if (isNative || hideDemo) {
+          return filterOutDemoFiles(parsed);
+        }
         const initialMap = new Map(initialFiles.map(f => [f.id, f]));
         return parsed.map(f => {
           const init = initialMap.get(f.id);
@@ -74,6 +90,11 @@ export default function App() {
           }
           return f;
         });
+      }
+
+      // If running on native Android installation or user requested clean mode, start empty with no demo files!
+      if (isNative || hideDemo) {
+        return [];
       }
     } catch (e) {
       console.error(e);
@@ -167,9 +188,11 @@ export default function App() {
           }
           if (result.files && result.files.length > 0) {
             setFiles(prev => {
-              const existingKeys = new Set(prev.map(f => f.url || f.name));
-              const newFiles = result.files.filter(f => !existingKeys.has(f.url || f.name));
-              return [...newFiles, ...prev];
+              // When real device files are scanned, filter out demo/mock files so only real device files are shown
+              const userCustomFiles = prev.filter(f => !f.id.startsWith('img-') && !f.id.startsWith('vid-') && !f.id.startsWith('aud-') && !f.id.startsWith('doc-') && !f.id.startsWith('app-') && !f.id.startsWith('arch-'));
+              const existingKeys = new Set(userCustomFiles.map(f => f.url || f.name));
+              const newRealFiles = result.files.filter(f => !existingKeys.has(f.url || f.name));
+              return [...newRealFiles, ...userCustomFiles];
             });
           }
           if (result.folders && result.folders.length > 0) {
@@ -272,8 +295,80 @@ export default function App() {
   const [isSafeFolderOpen, setIsSafeFolderOpen] = useState(false);
   const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [isStorageBreakdownOpen, setIsStorageBreakdownOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [isNotificationShadeOpen, setIsNotificationShadeOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<FileItem | null>(null);
   const [newFolderParentPath, setNewFolderParentPath] = useState<string | null>(null);
+
+  // Notifications Manager Helpers
+  const addOrUpdateNotification = (notif: AppNotification) => {
+    setNotifications(prev => {
+      const idx = prev.findIndex(n => n.id === notif.id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = notif;
+        return copy;
+      }
+      return [notif, ...prev];
+    });
+  };
+
+  const dismissNotification = (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
+  const clearAllNotifications = () => {
+    // Keep in-progress, clear completed
+    setNotifications(prev => prev.filter(n => n.status === 'in-progress'));
+    showToast(language === 'hi' ? 'सूचनाएं साफ़ की गईं' : 'Notifications cleared');
+  };
+
+  // Demo Files Management
+  const isDemoFilesActive = hasDemoFiles(files);
+
+  const handleClearDemoFiles = () => {
+    setFiles(prev => filterOutDemoFiles(prev));
+    try {
+      localStorage.setItem(STORAGE_HIDE_DEMO_KEY, 'true');
+    } catch (e) {
+      console.error(e);
+    }
+    showToast(
+      language === 'hi'
+        ? 'सभी डेमो फ़ाइलें हटा दी गईं। अब केवल आपकी असली फ़ाइलें दिखाई देंगी।'
+        : 'All demo files removed. Showing only genuine user storage.'
+    );
+  };
+
+  const handleRestoreDemoFiles = () => {
+    try {
+      localStorage.removeItem(STORAGE_HIDE_DEMO_KEY);
+    } catch (e) {
+      console.error(e);
+    }
+    setFiles(prev => {
+      const userFiles = filterOutDemoFiles(prev);
+      return [...initialFiles, ...userFiles];
+    });
+    showToast(
+      language === 'hi'
+        ? 'सैंपल डेमो फ़ाइलें लोड की गईं।'
+        : 'Sample demo files loaded.'
+    );
+  };
+
+  const handleFeedbackSubmitted = (fb: any) => {
+    addOrUpdateNotification({
+      id: `notif-fb-${Date.now()}`,
+      type: 'feedback',
+      title: language === 'hi' ? 'फ़ीडबैक डेवलपर को भेजा गया' : 'Feedback Sent to Developer',
+      description: `${fb.subject} (${fb.category}) • Delivered to Akash Kumar`,
+      status: 'completed',
+      timestamp: 'Just now',
+    });
+  };
 
   // Dedicated Media Player States (Audio, Video, PDF Reader)
   const [currentAudio, setCurrentAudio] = useState<FileItem | null>(null);
@@ -317,6 +412,55 @@ export default function App() {
     }
   }, [isAudioPlaying]);
 
+  // Sync notifications with Media Playback (Audio)
+  useEffect(() => {
+    if (currentAudio) {
+      addOrUpdateNotification({
+        id: 'media-audio-player',
+        type: 'media-playback',
+        title: currentAudio.name,
+        description: isAudioPlaying 
+          ? (language === 'hi' ? 'ऑडियो बज रहा है (Playing)' : 'Playing background audio')
+          : (language === 'hi' ? 'ऑडियो रुका हुआ है (Paused)' : 'Audio paused'),
+        progress: audioDuration > 0 ? (audioCurrentTime / audioDuration) * 100 : undefined,
+        status: 'in-progress',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        mediaDetails: {
+          title: currentAudio.name,
+          artist: 'Files by Akash Kumar Audio',
+          isPlaying: isAudioPlaying,
+          thumbnail: currentAudio.thumbnail,
+          duration: audioDuration,
+          currentTime: audioCurrentTime,
+        },
+      });
+    } else {
+      dismissNotification('media-audio-player');
+    }
+  }, [currentAudio, isAudioPlaying, audioCurrentTime, audioDuration, language]);
+
+  // Sync notifications with Video Player
+  useEffect(() => {
+    if (videoPlayerFile) {
+      addOrUpdateNotification({
+        id: 'media-video-player',
+        type: 'media-playback',
+        title: videoPlayerFile.name,
+        description: language === 'hi' ? 'वीडियो प्लेयर सक्रिय है' : 'Video player active',
+        status: 'in-progress',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        mediaDetails: {
+          title: videoPlayerFile.name,
+          artist: 'Files Video Player',
+          isPlaying: true,
+          thumbnail: videoPlayerFile.thumbnail,
+        },
+      });
+    } else {
+      dismissNotification('media-video-player');
+    }
+  }, [videoPlayerFile, language]);
+
   const handleNextTrack = () => {
     if (!currentAudio || audioPlaylist.length === 0) return;
     let nextIndex = 0;
@@ -340,6 +484,7 @@ export default function App() {
 
   const [archiveExtractFile, setArchiveExtractFile] = useState<FileItem | null>(null);
   const [zipCompressFiles, setZipCompressFiles] = useState<FileItem[]>([]);
+  const [legalModalTab, setLegalModalTab] = useState<'privacy' | 'terms' | null>(null);
 
   const handleExtractArchive = (file: FileItem) => {
     setArchiveExtractFile(file);
@@ -354,6 +499,19 @@ export default function App() {
       return [...extractedFiles, ...updated];
     });
     setArchiveExtractFile(null);
+    const notifId = `archive-extract-${Date.now()}`;
+    addOrUpdateNotification({
+      id: notifId,
+      type: 'archive',
+      title: language === 'hi' ? 'ज़िप फ़ाइल अनपैक हो गई' : 'Archive unzipped successfully',
+      description: `${extractedFiles.length} ${language === 'hi' ? 'फ़ाइलें निकाली गईं' : 'file(s) extracted'}`,
+      progress: 100,
+      status: 'completed',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      actions: {
+        targetPath: currentFolderPath,
+      },
+    });
     showToast(
       language === 'hi'
         ? `${extractedFiles.length} फ़ाइलें सफलतापूर्वक निकाली गईं`
@@ -369,6 +527,19 @@ export default function App() {
   const handleZipCreated = (createdZip: FileItem) => {
     setFiles(prev => [createdZip, ...prev]);
     setZipCompressFiles([]);
+    const notifId = `archive-zip-${Date.now()}`;
+    addOrUpdateNotification({
+      id: notifId,
+      type: 'archive',
+      title: language === 'hi' ? 'ज़िप फ़ाइल तैयार' : 'ZIP archive created',
+      description: `${createdZip.name} (${formatBytes(createdZip.size, 1)})`,
+      progress: 100,
+      status: 'completed',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      actions: {
+        targetPath: currentFolderPath,
+      },
+    });
     showToast(
       language === 'hi'
         ? `ZIP फ़ाइल तैयार: ${createdZip.name}`
@@ -646,48 +817,50 @@ export default function App() {
   );
 
   // Real File Upload Handler (via Drag and Drop or File Picker)
-  const handleUploadFiles = (fileList: FileList, targetFolder = '/Download') => {
+  const handleUploadFiles = async (fileList: FileList, targetFolder = '/Download') => {
     const newItems: FileItem[] = [];
-    const promises: Promise<void>[] = [];
 
-    Array.from(fileList).forEach(file => {
-      const p = new Promise<void>((resolve) => {
-        const reader = new FileReader();
-        const { type, mimeType } = classifyFile(file.name, file.type);
+    for (const file of Array.from(fileList)) {
+      const fileId = `upload-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+      const { type, mimeType } = classifyFile(file.name, file.type);
+      const objectUrl = URL.createObjectURL(file);
 
-        reader.onload = () => {
-          const result = reader.result as string;
-          newItems.push({
-            id: `upload-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-            name: file.name,
-            size: file.size,
-            type,
-            mimeType,
-            folder: targetFolder,
-            storageDevice: isFolderViewOpen ? activeStorageDevice : 'internal',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            url: result,
-            thumbnail: type === 'image' || type === 'video' ? result : undefined,
-            content: type === 'document' && file.type.includes('text') ? result : undefined,
-            isLarge: file.size > 10 * 1024 * 1024,
-          });
-          resolve();
-        };
+      // Save large blob into IndexedDB to prevent localStorage 5MB quota overflow
+      await saveFileBlob(fileId, file);
 
-        if (type === 'document' && file.type.includes('text')) {
-          reader.readAsText(file);
-        } else {
-          reader.readAsDataURL(file);
-        }
+      newItems.push({
+        id: fileId,
+        name: file.name,
+        size: file.size,
+        type,
+        mimeType,
+        folder: targetFolder,
+        storageDevice: isFolderViewOpen ? activeStorageDevice : 'internal',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        url: objectUrl,
+        thumbnail: type === 'image' || type === 'video' ? objectUrl : undefined,
+        isLarge: file.size > 10 * 1024 * 1024,
       });
-      promises.push(p);
-    });
+    }
 
-    Promise.all(promises).then(() => {
+    if (newItems.length > 0) {
       setFiles(prev => [...newItems, ...prev]);
+      const notifId = `upload-${Date.now()}`;
+      addOrUpdateNotification({
+        id: notifId,
+        type: 'upload',
+        title: language === 'hi' ? 'फ़ाइलें अपलोड हो गईं' : 'Files uploaded',
+        description: `${newItems.length} ${language === 'hi' ? 'फ़ाइलें जोड़ी गईं:' : 'file(s) added to:'} ${targetFolder}`,
+        progress: 100,
+        status: 'completed',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        actions: {
+          targetPath: targetFolder,
+        },
+      });
       showToast(`${newItems.length} ${t.fileUploaded}`);
-    });
+    }
   };
 
   const triggerUpload = (folder = '/Download') => {
@@ -721,8 +894,44 @@ export default function App() {
 
   // Clean Tab Actions
   const handleCleanJunk = () => {
-    setJunkBytes(0);
-    showToast(t.junkCleaned);
+    const junkToClean = junkBytes;
+    const notifId = `clean-${Date.now()}`;
+    
+    addOrUpdateNotification({
+      id: notifId,
+      type: 'clean',
+      title: language === 'hi' ? 'जंक फ़ाइलें साफ़ की जा रही हैं...' : 'Cleaning junk cache files...',
+      description: `${formatBytes(junkToClean, 1)} temporary cache & APK residue`,
+      progress: 30,
+      status: 'in-progress',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    });
+
+    setTimeout(() => {
+      addOrUpdateNotification({
+        id: notifId,
+        type: 'clean',
+        title: language === 'hi' ? 'जंक फ़ाइलें साफ़ की जा रही हैं...' : 'Cleaning junk cache files...',
+        description: 'Removing thumbnail cache & app residue...',
+        progress: 80,
+        status: 'in-progress',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+    }, 400);
+
+    setTimeout(() => {
+      setJunkBytes(0);
+      addOrUpdateNotification({
+        id: notifId,
+        type: 'clean',
+        title: language === 'hi' ? 'जंक फ़ाइलें साफ़ हो गईं' : 'Junk files cleaned',
+        description: `${language === 'hi' ? 'खाली की गई जगह:' : 'Freed up'} +${formatBytes(junkToClean, 1)}`,
+        progress: 100,
+        status: 'completed',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+      showToast(t.junkCleaned);
+    }, 900);
   };
 
   const handleDeleteDuplicates = (keepId: string, deleteIds: string[]) => {
@@ -803,7 +1012,7 @@ export default function App() {
     showToast("File renamed");
   };
 
-  const handleCreateFolder = (
+  const handleCreateFolder = async (
     folderName: string, 
     parentPath: string, 
     device: StorageDevice = 'internal'
@@ -819,6 +1028,16 @@ export default function App() {
     };
     setFolders(prev => [...prev, newFolder]);
     showToast(`${t.folderCreated}: ${folderName}`);
+
+    // Create actual folder on native disk if on Android
+    try {
+      const isNat = await isNativePlatform();
+      if (isNat) {
+        await createNativeFolder(fullPath);
+      }
+    } catch (e) {
+      console.warn('Native create folder warning:', e);
+    }
   };
 
   // -------------------------------------------------------------
@@ -1086,6 +1305,43 @@ export default function App() {
     });
   };
 
+  // Sync ongoing Copy / Move / Transfer operations to Notification Shade
+  useEffect(() => {
+    if (!transferTask) return;
+    const isCompleted = transferTask.status === 'completed';
+    const isPaused = transferTask.status === 'paused';
+    const isCancelled = transferTask.status === 'cancelled';
+    const percent = transferTask.totalBytes > 0 
+      ? Math.round((transferTask.transferredBytes / transferTask.totalBytes) * 100) 
+      : (isCompleted ? 100 : 0);
+
+    const opName = transferTask.operation === 'copy' 
+      ? (language === 'hi' ? 'फ़ाइलें कॉपी हो रही हैं' : 'Copying files') 
+      : (language === 'hi' ? 'फ़ाइलें स्थानांतरित (Move) हो रही हैं' : 'Moving files');
+
+    const curFile = transferTask.files[transferTask.currentFileIndex]?.name || 'Files';
+    const targetPath = transferTask.targetFolder;
+
+    addOrUpdateNotification({
+      id: transferTask.id,
+      type: 'file-operation',
+      title: isCompleted 
+        ? (language === 'hi' ? 'फ़ाइलें सफलतापूर्वक ट्रांसफर हुईं' : 'Files transferred successfully')
+        : opName,
+      description: isCompleted
+        ? `${transferTask.files.length} ${language === 'hi' ? 'फ़ाइलें सेव हुईं:' : 'files saved to:'} ${targetPath}`
+        : `${curFile} • ${formatBytes(transferTask.transferredBytes, 1)} / ${formatBytes(transferTask.totalBytes, 1)}`,
+      progress: percent,
+      speed: isCompleted ? 'Completed' : `${transferTask.speedMbps} MB/s`,
+      status: isCompleted ? 'completed' : isPaused ? 'paused' : isCancelled ? 'failed' : 'in-progress',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      actions: {
+        cancelable: !isCompleted && !isCancelled,
+        targetPath: isCompleted ? targetPath : undefined,
+      },
+    });
+  }, [transferTask, language]);
+
   // Search Results filtering
   const activeSearchResults = searchQuery.trim()
     ? sortFiles(
@@ -1126,7 +1382,7 @@ export default function App() {
           <div className="bg-white p-6 rounded-3xl shadow-xl flex flex-col items-center gap-3">
             <UploadCloud size={48} className="text-blue-600 animate-bounce" />
             <p className="text-base font-semibold text-neutral-900">
-              Drop files here to upload into Google Files
+              {language === 'hi' ? 'फ़ाइलें यहाँ छोड़ें (Files by Akash Kumar)' : 'Drop files here to upload into Files by Akash Kumar'}
             </p>
             <p className="text-xs text-neutral-500">
               Files will be saved directly into {isFolderViewOpen ? currentFolderPath : '/Download'}
@@ -1134,6 +1390,15 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Android Floating Heads-Up / Top Notification Bar */}
+      <FloatingNotificationBar
+        activeNotification={notifications.find(n => n.status === 'in-progress') || null}
+        totalActiveCount={notifications.filter(n => n.status === 'in-progress').length}
+        onOpenShade={() => setIsNotificationShadeOpen(true)}
+        isAudioPlaying={isAudioPlaying}
+        onPlayPauseAudio={() => setIsAudioPlaying(!isAudioPlaying)}
+      />
 
       {/* Top Application Header */}
       <Header
@@ -1150,6 +1415,8 @@ export default function App() {
         onOpenStorageBreakdown={() => setIsStorageBreakdownOpen(true)}
         onOpenDrawer={() => setIsDrawerOpen(true)}
         onOpenAccount={() => setIsAccountOpen(true)}
+        onOpenNotifications={() => setIsNotificationShadeOpen(true)}
+        activeNotificationCount={notifications.length}
         userAccount={userAccount}
       />
 
@@ -1313,6 +1580,8 @@ export default function App() {
                 onDeleteFile={handleMoveToTrash}
                 onOpenStorageBreakdown={() => setIsStorageBreakdownOpen(true)}
                 language={language}
+                hasDemoFiles={isDemoFilesActive}
+                onClearDemoFiles={handleClearDemoFiles}
               />
             )}
 
@@ -1347,6 +1616,8 @@ export default function App() {
                 onShowInfo={setPreviewFile}
                 onCopyTo={handleInitiateCopy}
                 onMoveTo={handleInitiateMove}
+                hasDemoFiles={isDemoFilesActive}
+                onClearDemoFiles={handleClearDemoFiles}
               />
             )}
 
@@ -1517,7 +1788,12 @@ export default function App() {
         onOpenSafeFolder={() => setIsSafeFolderOpen(true)}
         onOpenTrash={() => setIsTrashOpen(true)}
         onOpenStorageBreakdown={() => setIsStorageBreakdownOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenNotifications={() => setIsNotificationShadeOpen(true)}
+        activeNotificationCount={notifications.length}
         onOpenAccount={() => setIsAccountOpen(true)}
+        onOpenLegal={(tab) => setLegalModalTab(tab)}
+        onOpenFeedback={() => setIsFeedbackOpen(true)}
         userAccount={userAccount}
       />
 
@@ -1533,6 +1809,8 @@ export default function App() {
           setIsAccountOpen(false);
           setIsStorageBreakdownOpen(true);
         }}
+        onOpenLegal={(tab) => setLegalModalTab(tab)}
+        onOpenFeedback={() => setIsFeedbackOpen(true)}
         language={language}
       />
 
@@ -1649,6 +1927,76 @@ export default function App() {
         language={language}
         onClose={() => setZipCompressFiles([])}
         onZipCreated={handleZipCreated}
+      />
+
+      {/* Privacy Policy & Terms of Service Modal */}
+      <LegalModal
+        isOpen={legalModalTab !== null}
+        initialTab={legalModalTab || 'privacy'}
+        language={language}
+        onClose={() => setLegalModalTab(null)}
+      />
+
+      {/* Comprehensive Application Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        language={language}
+        onLanguageChange={(newLang) => setLanguage(newLang)}
+        storage={storage}
+        onOpenStorageBreakdown={() => {
+          setIsSettingsOpen(false);
+          setIsStorageBreakdownOpen(true);
+        }}
+        onOpenLegal={(tab) => {
+          setIsSettingsOpen(false);
+          setLegalModalTab(tab);
+        }}
+        showToast={showToast}
+        hasDemoFiles={isDemoFilesActive}
+        onClearDemoFiles={handleClearDemoFiles}
+        onRestoreDemoFiles={handleRestoreDemoFiles}
+        onOpenFeedback={() => setIsFeedbackOpen(true)}
+      />
+
+      {/* Developer Feedback & Ticket Log Sheet Modal */}
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+        userAccount={userAccount}
+        onOpenAccount={() => {
+          setIsFeedbackOpen(false);
+          setIsAccountOpen(true);
+        }}
+        onSignIn={handleSignIn}
+        storage={storage}
+        language={language}
+        showToast={showToast}
+        onFeedbackSubmitted={handleFeedbackSubmitted}
+      />
+
+      {/* Android 14/15 Notification Shade & Ongoing Tasks Overlay */}
+      <NotificationShade
+        isOpen={isNotificationShadeOpen}
+        onClose={() => setIsNotificationShadeOpen(false)}
+        notifications={notifications}
+        onDismissNotification={dismissNotification}
+        onClearAllNotifications={clearAllNotifications}
+        onCancelTask={(id) => {
+          if (transferTask && transferTask.id === id) {
+            handleCancelTransfer();
+          }
+          dismissNotification(id);
+        }}
+        onNavigateToFolder={(targetPath) => {
+          setIsFolderViewOpen(true);
+          setCurrentFolderPath(targetPath);
+        }}
+        isAudioPlaying={isAudioPlaying}
+        onPlayPauseAudio={() => setIsAudioPlaying(!isAudioPlaying)}
+        onNextTrack={handleNextTrack}
+        onPrevTrack={handlePrevTrack}
+        language={language}
       />
     </div>
   );

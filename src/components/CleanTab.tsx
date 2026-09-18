@@ -9,7 +9,8 @@ import {
   AlertCircle,
   FileText,
   ChevronRight,
-  ImageIcon
+  ImageIcon,
+  HardDrive
 } from 'lucide-react';
 import { FileItem, StorageBreakdown, Language } from '../types';
 import { formatBytes } from '../utils/storage';
@@ -24,6 +25,8 @@ interface CleanTabProps {
   onDeleteFile: (fileId: string) => void;
   onOpenStorageBreakdown: () => void;
   language: Language;
+  hasDemoFiles?: boolean;
+  onClearDemoFiles?: () => void;
 }
 
 export const CleanTab: React.FC<CleanTabProps> = ({
@@ -35,6 +38,8 @@ export const CleanTab: React.FC<CleanTabProps> = ({
   onDeleteFile,
   onOpenStorageBreakdown,
   language,
+  hasDemoFiles = false,
+  onClearDemoFiles,
 }) => {
   const t = translations[language];
   const [cleaningJunk, setCleaningJunk] = useState(false);
@@ -235,6 +240,42 @@ export const CleanTab: React.FC<CleanTabProps> = ({
               <div className="text-sm font-semibold text-neutral-900">Junk cache is clean</div>
               <div className="text-xs text-neutral-500">No temporary cache files consuming your device storage</div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Demo Files Cleanup Card (Displayed when demo/sample files are present) */}
+      {hasDemoFiles && onClearDemoFiles && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-3xl p-6 border border-amber-200/90 shadow-2xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 shadow-xs">
+                <HardDrive size={24} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-neutral-900">
+                    {language === 'hi' ? 'सैंपल डेमो फ़ाइलें हटाएं' : 'Remove Sample Demo Files'}
+                  </h3>
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-amber-200 text-amber-900">
+                    DEMO
+                  </span>
+                </div>
+                <p className="text-xs text-neutral-600 mt-0.5">
+                  {language === 'hi' 
+                    ? 'इंस्टॉल के बाद डेमो फ़ाइलों की आवश्यकता नहीं है। असली डिवाइस उपयोग के लिए इन्हें हटाएं।' 
+                    : 'Clean up mock demo files so your app displays only your real personal device files.'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={onClearDemoFiles}
+              className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs sm:text-sm rounded-full shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0 self-start sm:self-center"
+            >
+              <Trash2 size={16} />
+              <span>{t.clearDemoFiles}</span>
+            </button>
           </div>
         </div>
       )}

@@ -14,6 +14,7 @@ import { FileItem, Language } from '../types';
 import { formatBytes } from '../utils/storage';
 import { translations } from '../utils/translations';
 import { FileItemCard } from './FileItemCard';
+import { verifyVaultPin, saveVaultPin, hasVaultPin } from '../utils/cryptoVault';
 
 interface SafeFolderModalProps {
   files: FileItem[];
@@ -38,9 +39,6 @@ export const SafeFolderModal: React.FC<SafeFolderModalProps> = ({
   const [pin, setPin] = useState('');
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [currentPin, setCurrentPin] = useState(() => {
-    return localStorage.getItem('google_files_safe_pin') || '1234';
-  });
   const [isChangingPin, setIsChangingPin] = useState(false);
   const [newPin, setNewPin] = useState('');
 
@@ -48,9 +46,10 @@ export const SafeFolderModal: React.FC<SafeFolderModalProps> = ({
 
   const safeFiles = files.filter(f => f.isSafe && !f.isTrash);
 
-  const handleUnlock = (e: React.FormEvent) => {
+  const handleUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin === currentPin) {
+    const isValid = await verifyVaultPin(pin);
+    if (isValid) {
       setIsUnlocked(true);
       setErrorMsg('');
     } else {
@@ -58,11 +57,10 @@ export const SafeFolderModal: React.FC<SafeFolderModalProps> = ({
     }
   };
 
-  const handleSetNewPin = (e: React.FormEvent) => {
+  const handleSetNewPin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPin.length === 4) {
-      localStorage.setItem('google_files_safe_pin', newPin);
-      setCurrentPin(newPin);
+      await saveVaultPin(newPin);
       setIsChangingPin(false);
       setNewPin('');
     }
