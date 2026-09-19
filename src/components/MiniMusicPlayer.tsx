@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, SkipForward, X, Music } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, X, Music, Lock } from 'lucide-react';
 import { FileItem } from '../types';
 import { triggerHapticFeedback } from '../utils/nativeStorage';
 
@@ -11,6 +11,8 @@ interface MiniMusicPlayerProps {
   onExpand: () => void;
   onPlayPause: () => void;
   onNext: () => void;
+  onPrev?: () => void;
+  onOpenLockScreen?: () => void;
   onClose: () => void;
 }
 
@@ -22,6 +24,8 @@ export const MiniMusicPlayer: React.FC<MiniMusicPlayerProps> = ({
   onExpand,
   onPlayPause,
   onNext,
+  onPrev,
+  onOpenLockScreen,
   onClose,
 }) => {
   if (!file) return null;
@@ -66,7 +70,20 @@ export const MiniMusicPlayer: React.FC<MiniMusicPlayerProps> = ({
       </div>
 
       {/* Action buttons */}
-      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+        {onPrev && (
+          <button
+            onClick={() => {
+              triggerHapticFeedback();
+              onPrev();
+            }}
+            className="p-1.5 text-neutral-300 hover:text-white rounded-full hover:bg-neutral-800/80 transition-colors cursor-pointer"
+            title="Previous"
+          >
+            <SkipBack size={16} />
+          </button>
+        )}
+
         <button
           onClick={() => {
             triggerHapticFeedback();
@@ -83,11 +100,24 @@ export const MiniMusicPlayer: React.FC<MiniMusicPlayerProps> = ({
             triggerHapticFeedback();
             onNext();
           }}
-          className="p-2 text-neutral-300 hover:text-white rounded-full hover:bg-neutral-800/80 transition-colors cursor-pointer"
+          className="p-1.5 text-neutral-300 hover:text-white rounded-full hover:bg-neutral-800/80 transition-colors cursor-pointer"
           title="Next"
         >
-          <SkipForward size={18} />
+          <SkipForward size={16} />
         </button>
+
+        {onOpenLockScreen && (
+          <button
+            onClick={() => {
+              triggerHapticFeedback();
+              onOpenLockScreen();
+            }}
+            className="p-1.5 text-emerald-400 hover:text-emerald-300 rounded-full hover:bg-neutral-800/80 transition-colors cursor-pointer"
+            title="Lock Screen Player"
+          >
+            <Lock size={15} />
+          </button>
+        )}
 
         <button
           onClick={() => {
@@ -97,7 +127,7 @@ export const MiniMusicPlayer: React.FC<MiniMusicPlayerProps> = ({
           className="p-1.5 text-neutral-400 hover:text-white rounded-full hover:bg-neutral-800/80 transition-colors cursor-pointer"
           title="Dismiss"
         >
-          <X size={16} />
+          <X size={15} />
         </button>
       </div>
     </div>

@@ -25,7 +25,8 @@ import {
   CheckCircle2,
   Layers,
   Sparkles,
-  X
+  X,
+  MoreVertical
 } from 'lucide-react';
 import { FileCategory, FileItem, ViewMode, SortOption, Language } from '../types';
 import { filterFilesByCategory, sortFiles, formatBytes } from '../utils/storage';
@@ -58,6 +59,7 @@ interface CategoryDetailViewProps {
   onQuickCut?: (file: FileItem) => void;
   onExtractArchive?: (file: FileItem) => void;
   onCompressZip?: (files: FileItem[]) => void;
+  onShare?: (fileOrFiles: FileItem | FileItem[]) => void;
   onRegisterSelectionClearer?: (clearer: (() => boolean) | null) => void;
   onRefreshStorage?: () => void;
 }
@@ -87,6 +89,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
   onQuickCut,
   onExtractArchive,
   onCompressZip,
+  onShare,
   onRegisterSelectionClearer,
   onRefreshStorage,
 }) => {
@@ -98,6 +101,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
   const [activeSubFilter, setActiveSubFilter] = useState<string>('all');
   const [isScanning, setIsScanning] = useState(false);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
+  const [showBatchMenu, setShowBatchMenu] = useState(false);
 
   // Register selection clearer for hardware/gesture back button
   useEffect(() => {
@@ -261,118 +265,260 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
 
   const handleBatchShare = () => {
     if (selectedIds.length === 0) return;
-    const selectedFiles = files.filter(f => selectedIds.includes(f.id));
-    const urls = selectedFiles.map(f => f.url).filter(Boolean) as string[];
-    const names = selectedFiles.map(f => f.name).join(', ');
-    shareNativeFile(
-      `${selectedFiles.length} files`,
-      `Sharing: ${names}`,
-      urls[0],
-      urls
-    );
+    const selected = files.filter(f => selectedIds.includes(f.id));
+    if (onShare) {
+      onShare(selected);
+      setSelectedIds([]);
+    } else {
+      const urls = selected.map(f => f.url).filter(Boolean) as string[];
+      const names = selected.map(f => f.name).join(', ');
+      shareNativeFile(
+        `${selected.length} files`,
+        `Sharing: ${names}`,
+        urls[0],
+        urls,
+        selected
+      );
+      setSelectedIds([]);
+    }
   };
 
   const totalSize = categoryFiles.reduce((acc, f) => acc + f.size, 0);
   const totalAllCategorySize = allCategoryFiles.reduce((acc, f) => acc + f.size, 0);
+  const selectedFiles = useMemo(() => files.filter(f => selectedIds.includes(f.id)), [files, selectedIds]);
 
   return (
     <div className="space-y-3.5 pb-24 animate-in fade-in duration-200">
       {/* Top Header & Navigation */}
-      <div className="flex items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-neutral-200/90 shadow-2xs">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              if (selectedIds.length > 0) {
-                setSelectedIds([]);
-              } else {
-                onBack();
-              }
-            }}
-            className="p-2 -ml-1 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors cursor-pointer"
-            title="Go back"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-neutral-100 flex items-center justify-center shrink-0">
-              {getCategoryIcon()}
+      <div className="flex items-center justify-between gap-3 bg-white dark:bg-[#1e231f] p-3.5 sm:p-4 rounded-2xl border border-neutral-200/90 dark:border-neutral-800 shadow-2xs">
+        {selectedIds.length > 0 ? (
+          /* Selection Mode Header with 3-Dot Batch Actions */
+          <>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSelectedIds([])}
+                className="p-2 -ml-1 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors cursor-pointer"
+                title={language === 'hi' ? 'चयन हटाएं' : 'Clear selection'}
+              >
+                <X size={20} />
+              </button>
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white">
+                  {selectedIds.length} {t.batchSelected}
+                </h2>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">
+                  {formatBytes(selectedFiles.reduce((acc, f) => acc + f.size, 0))}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-neutral-900 capitalize">
-                {categoryTitle()}
-              </h2>
-              <p className="text-xs text-neutral-500 font-medium">
-                {allCategoryFiles.length} {t.items} • {formatBytes(totalAllCategorySize)}
-              </p>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleSelectAll}
+                className="px-2.5 py-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-xl flex items-center gap-1.5 border border-neutral-200 dark:border-neutral-700 cursor-pointer"
+              >
+                {selectedIds.length === categoryFiles.length && categoryFiles.length > 0 ? (
+                  <>
+                    <CheckSquare size={14} className="text-blue-600" />
+                    <span>{language === 'hi' ? 'चयन हटाएं' : 'Deselect'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Square size={14} />
+                    <span>{t.selectAll}</span>
+                  </>
+                )}
+              </button>
+
+              {/* 3-Dot Actions Menu for Selection */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowBatchMenu(!showBatchMenu)}
+                  title={language === 'hi' ? 'अधिक विकल्प' : 'More options'}
+                  className="p-2 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors cursor-pointer border border-neutral-200 dark:border-neutral-700"
+                >
+                  <MoreVertical size={18} />
+                </button>
+
+                {showBatchMenu && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowBatchMenu(false)} />
+                    <div className="absolute right-0 mt-1 w-52 sm:w-56 bg-white dark:bg-[#1e231f] border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-xl z-50 py-1.5 text-xs text-neutral-800 dark:text-neutral-200 animate-in fade-in zoom-in-95 max-h-[80vh] overflow-y-auto">
+                      <div className="px-3.5 py-1.5 bg-blue-50/80 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 font-bold border-b border-blue-100 dark:border-blue-900/40 mb-1">
+                        <span>{language === 'hi' ? `${selectedFiles.length} फ़ाइलें चुनी गईं` : `${selectedFiles.length} files selected`}</span>
+                      </div>
+
+                      {/* 1. Share */}
+                      <button
+                        onClick={() => {
+                          setShowBatchMenu(false);
+                          handleBatchShare();
+                        }}
+                        className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-blue-600 dark:text-blue-400 font-medium transition-colors cursor-pointer"
+                      >
+                        <Share2 size={15} className="shrink-0" />
+                        <span>{language === 'hi' ? `शेयर करें (${selectedFiles.length})` : `Share (${selectedFiles.length})`}</span>
+                      </button>
+
+                      <div className="my-1 border-t border-neutral-100 dark:border-neutral-800" />
+
+                      {/* 2. Copy */}
+                      {onCopyToClipboard && (
+                        <button
+                          onClick={() => {
+                            setShowBatchMenu(false);
+                            onCopyToClipboard(selectedFiles);
+                            setSelectedIds([]);
+                          }}
+                          className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-neutral-800 dark:text-neutral-200 font-medium transition-colors cursor-pointer"
+                        >
+                          <Copy size={15} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                          <span>{language === 'hi' ? `कॉपी करें (${selectedFiles.length})` : `Copy (${selectedFiles.length})`}</span>
+                        </button>
+                      )}
+
+                      {/* 3. Cut */}
+                      {onCutToClipboard && (
+                        <button
+                          onClick={() => {
+                            setShowBatchMenu(false);
+                            onCutToClipboard(selectedFiles);
+                            setSelectedIds([]);
+                          }}
+                          className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-neutral-800 dark:text-neutral-200 font-medium transition-colors cursor-pointer"
+                        >
+                          <Scissors size={15} className="text-purple-600 dark:text-purple-400 shrink-0" />
+                          <span>{language === 'hi' ? `कट (यहाँ से हटाएँ) (${selectedFiles.length})` : `Cut (${selectedFiles.length})`}</span>
+                        </button>
+                      )}
+
+                      {/* 4. Copy to... */}
+                      {onBatchCopy && (
+                        <button
+                          onClick={() => {
+                            setShowBatchMenu(false);
+                            onBatchCopy(selectedFiles);
+                            setSelectedIds([]);
+                          }}
+                          className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-neutral-800 dark:text-neutral-200 font-medium transition-colors cursor-pointer"
+                        >
+                          <FolderInput size={15} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                          <span>{language === 'hi' ? 'कॉपी करें...' : 'Copy to...'}</span>
+                        </button>
+                      )}
+
+                      {/* 5. Move to... */}
+                      {onBatchMove && (
+                        <button
+                          onClick={() => {
+                            setShowBatchMenu(false);
+                            onBatchMove(selectedFiles);
+                            setSelectedIds([]);
+                          }}
+                          className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-neutral-800 dark:text-neutral-200 font-medium transition-colors cursor-pointer"
+                        >
+                          <FolderInput size={15} className="text-purple-600 dark:text-purple-400 shrink-0" />
+                          <span>{language === 'hi' ? 'यहाँ ले जाएँ...' : 'Move to...'}</span>
+                        </button>
+                      )}
+
+                      {/* 6. ZIP */}
+                      {onCompressZip && (
+                        <button
+                          onClick={() => {
+                            setShowBatchMenu(false);
+                            onCompressZip(selectedFiles);
+                            setSelectedIds([]);
+                          }}
+                          className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-neutral-800 dark:text-neutral-200 font-medium transition-colors cursor-pointer"
+                        >
+                          <FolderArchive size={15} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                          <span>{language === 'hi' ? `ZIP बनाएं (${selectedFiles.length})` : `Create ZIP (${selectedFiles.length})`}</span>
+                        </button>
+                      )}
+
+                      <div className="my-1 border-t border-neutral-100 dark:border-neutral-800" />
+
+                      {/* 7. Star */}
+                      <button
+                        onClick={() => {
+                          setShowBatchMenu(false);
+                          handleBatchStar();
+                        }}
+                        className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-neutral-800 dark:text-neutral-200 transition-colors cursor-pointer"
+                      >
+                        <Star size={15} className="text-amber-500 shrink-0" />
+                        <span>{language === 'hi' ? 'स्टार मार्क करें' : 'Add to Starred'}</span>
+                      </button>
+
+                      <div className="my-1 border-t border-neutral-100 dark:border-neutral-800" />
+
+                      {/* 8. Trash / Delete */}
+                      <button
+                        onClick={() => {
+                          setShowBatchMenu(false);
+                          handleBatchDelete();
+                        }}
+                        className="w-full text-left px-3.5 py-2 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center gap-2.5 font-medium transition-colors cursor-pointer"
+                      >
+                        <Trash2 size={15} className="shrink-0" />
+                        <span>{language === 'hi' ? `हटाएं (${selectedFiles.length})` : `Delete (${selectedFiles.length})`}</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
+          </>
+        ) : (
+          /* Normal Header */
+          <>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onBack}
+                className="p-2 -ml-1 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors cursor-pointer"
+                title="Go back"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full bg-neutral-100 flex items-center justify-center shrink-0">
+                  {getCategoryIcon()}
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-neutral-900 capitalize">
+                    {categoryTitle()}
+                  </h2>
+                  <p className="text-xs text-neutral-500 font-medium">
+                    {allCategoryFiles.length} {t.items} • {formatBytes(totalAllCategorySize)}
+                  </p>
+                </div>
+              </div>
+            </div>
 
-        {/* Action icons / Search / Scan / Select All */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setShowSearch(!showSearch)}
-            title={language === 'hi' ? 'खोजें' : 'Search files'}
-            className={`p-2 rounded-xl border transition-colors cursor-pointer ${
-              showSearch ? 'bg-blue-50 border-blue-300 text-blue-600' : 'text-neutral-600 hover:bg-neutral-100 border-neutral-200'
-            }`}
-          >
-            <Search size={16} />
-          </button>
+            {/* Action icons / Search / Select All */}
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setShowSearch(!showSearch)}
+                title={language === 'hi' ? 'खोजें' : 'Search files'}
+                className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                  showSearch ? 'bg-blue-50 border-blue-300 text-blue-600' : 'text-neutral-600 hover:bg-neutral-100 border-neutral-200'
+                }`}
+              >
+                <Search size={16} />
+              </button>
 
-          <button
-            onClick={handleDeepScanCategory}
-            title={language === 'hi' ? 'पूरा फ़ोन स्कैन करें' : 'Deep scan device'}
-            className={`p-2 rounded-xl border transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold ${
-              isScanning 
-                ? 'bg-blue-600 text-white border-blue-600' 
-                : 'text-blue-700 bg-blue-50/80 border-blue-200 hover:bg-blue-100'
-            }`}
-          >
-            <RefreshCw size={15} className={isScanning ? 'animate-spin' : ''} />
-            <span className="hidden sm:inline">
-              {language === 'hi' ? 'स्कैन करें' : 'Scan Phone'}
-            </span>
-          </button>
-
-          <button
-            onClick={handleSelectAll}
-            className="px-2.5 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 rounded-xl flex items-center gap-1.5 border border-neutral-200 cursor-pointer"
-          >
-            {selectedIds.length === categoryFiles.length && categoryFiles.length > 0 ? (
-              <>
-                <CheckSquare size={14} className="text-blue-600" />
-                <span>Deselect</span>
-              </>
-            ) : (
-              <>
+              <button
+                onClick={handleSelectAll}
+                className="px-2.5 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 rounded-xl flex items-center gap-1.5 border border-neutral-200 cursor-pointer"
+              >
                 <Square size={14} />
                 <span>{t.selectAll}</span>
-              </>
-            )}
-          </button>
-        </div>
+              </button>
+            </div>
+          </>
+        )}
       </div>
-
-      {/* Live Scan Notification Feedback */}
-      {scanMessage && (
-        <div className="bg-blue-600 text-white p-3 rounded-2xl flex items-center justify-between gap-3 shadow-md animate-in fade-in">
-          <div className="flex items-center gap-2.5 min-w-0">
-            {isScanning ? (
-              <RefreshCw size={16} className="animate-spin shrink-0" />
-            ) : (
-              <CheckCircle2 size={16} className="text-emerald-300 shrink-0" />
-            )}
-            <span className="text-xs font-medium truncate">{scanMessage}</span>
-          </div>
-          <button 
-            onClick={() => setScanMessage(null)}
-            className="p-1 hover:bg-white/20 rounded-lg text-white"
-          >
-            <X size={14} />
-          </button>
-        </div>
-      )}
 
       {/* Search Input Filter */}
       {showSearch && (
@@ -401,107 +547,6 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
         </div>
       )}
 
-      {/* STORAGE SOURCE SELECTOR TABS (All Phone vs Internal vs SD Card) */}
-      <div className="bg-white p-2 rounded-2xl border border-neutral-200/90 shadow-2xs">
-        <div className="flex items-center justify-between px-1 pb-1.5 border-b border-neutral-100">
-          <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
-            <Layers size={12} />
-            {language === 'hi' ? 'फ़ोन स्टोरेज स्रोत' : 'Storage Source'}
-          </span>
-          <span className="text-[11px] font-semibold text-neutral-600">
-            {language === 'hi' ? 'कुल उपलब्ध:' : 'Total:'} {allCategoryFiles.length} {t.items} ({formatBytes(totalAllCategorySize)})
-          </span>
-        </div>
-
-        <div className="grid grid-cols-3 gap-1.5 pt-2">
-          {/* All Phone Storage */}
-          <button
-            onClick={() => {
-              triggerHapticFeedback();
-              setStorageLocationFilter('all');
-            }}
-            className={`py-2 px-2.5 rounded-xl text-xs font-bold flex flex-col items-center justify-center transition-all cursor-pointer ${
-              storageLocationFilter === 'all'
-                ? 'bg-neutral-900 text-white shadow-xs'
-                : 'bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border border-neutral-200/70'
-            }`}
-          >
-            <div className="flex items-center gap-1.5">
-              <span>🌐</span>
-              <span>{language === 'hi' ? 'पूरा फ़ोन (All)' : 'All Storage'}</span>
-            </div>
-            <span className={`text-[10px] font-medium mt-0.5 ${storageLocationFilter === 'all' ? 'text-neutral-300' : 'text-neutral-500'}`}>
-              {allCategoryFiles.length} {t.items}
-            </span>
-          </button>
-
-          {/* Internal Storage */}
-          <button
-            onClick={() => {
-              triggerHapticFeedback();
-              setStorageLocationFilter('internal');
-            }}
-            className={`py-2 px-2.5 rounded-xl text-xs font-bold flex flex-col items-center justify-center transition-all cursor-pointer ${
-              storageLocationFilter === 'internal'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-blue-50/70 hover:bg-blue-100/70 text-blue-900 border border-blue-200/70'
-            }`}
-          >
-            <div className="flex items-center gap-1.5">
-              <Smartphone size={13} />
-              <span>{language === 'hi' ? 'इंटरनल' : 'Internal'}</span>
-            </div>
-            <span className={`text-[10px] font-medium mt-0.5 ${storageLocationFilter === 'internal' ? 'text-blue-100' : 'text-blue-700'}`}>
-              {internalFiles.length} {t.items}
-            </span>
-          </button>
-
-          {/* SD Card Storage */}
-          <button
-            onClick={() => {
-              triggerHapticFeedback();
-              setStorageLocationFilter('sdcard');
-            }}
-            className={`py-2 px-2.5 rounded-xl text-xs font-bold flex flex-col items-center justify-center transition-all cursor-pointer ${
-              storageLocationFilter === 'sdcard'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-purple-50/70 hover:bg-purple-100/70 text-purple-900 border border-purple-200/70'
-            }`}
-          >
-            <div className="flex items-center gap-1.5">
-              <HardDrive size={13} />
-              <span>{language === 'hi' ? 'SD कार्ड' : 'SD Card'}</span>
-            </div>
-            <span className={`text-[10px] font-medium mt-0.5 ${storageLocationFilter === 'sdcard' ? 'text-purple-100' : 'text-purple-700'}`}>
-              {sdCardFiles.length} {t.items}
-            </span>
-          </button>
-        </div>
-      </div>
-
-      {/* Quick Play All Bar for Audio Tracks */}
-      {category === 'audio' && categoryFiles.length > 0 && (
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => onOpenPreview(categoryFiles[0])}
-            className="flex-1 py-2.5 px-4 bg-amber-500 hover:bg-amber-600 active:scale-98 text-neutral-950 font-bold rounded-2xl text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
-          >
-            <Play size={15} className="fill-neutral-950" />
-            <span>{language === 'hi' ? 'सभी ऑडियो चलाएं' : 'Play All Songs'}</span>
-          </button>
-          <button
-            onClick={() => {
-              const randomIdx = Math.floor(Math.random() * categoryFiles.length);
-              onOpenPreview(categoryFiles[randomIdx]);
-            }}
-            className="py-2.5 px-4 bg-white hover:bg-neutral-50 active:scale-98 text-neutral-800 font-semibold rounded-2xl text-xs flex items-center justify-center gap-2 border border-neutral-200/90 shadow-2xs transition-all cursor-pointer"
-          >
-            <Shuffle size={15} className="text-amber-600" />
-            <span>{language === 'hi' ? 'शफ़ल' : 'Shuffle'}</span>
-          </button>
-        </div>
-      )}
-
       {/* Sub-Category Filter Chips */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
         <button
@@ -512,7 +557,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
               : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
           }`}
         >
-          All ({storageLocationFilter === 'all' ? allCategoryFiles.length : storageLocationFilter === 'internal' ? internalFiles.length : sdCardFiles.length})
+          All ({allCategoryFiles.length})
         </button>
 
         {category === 'audio' && (
@@ -666,109 +711,6 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
         )}
       </div>
 
-      {/* Batch Action Floating Toolbar */}
-      {selectedIds.length > 0 && (
-        <div className="sticky top-16 z-20 bg-blue-50 border border-blue-200 p-3 rounded-2xl flex items-center justify-between gap-3 shadow-sm animate-in fade-in">
-          <span className="text-xs font-semibold text-blue-900">
-            {selectedIds.length} {t.batchSelected}
-          </span>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={handleBatchShare}
-              className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Share selected files"
-            >
-              <Share2 size={13} />
-              <span>{language === 'hi' ? 'शेयर करें' : 'Share'}</span>
-            </button>
-            {onCopyToClipboard && (
-              <button
-                onClick={() => {
-                  const selectedFiles = files.filter(f => selectedIds.includes(f.id));
-                  onCopyToClipboard(selectedFiles);
-                  setSelectedIds([]);
-                }}
-                className="px-2.5 py-1.5 bg-white border border-blue-200 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Copy to clipboard"
-              >
-                <Copy size={13} />
-                <span>{t.copy}</span>
-              </button>
-            )}
-            {onCutToClipboard && (
-              <button
-                onClick={() => {
-                  const selectedFiles = files.filter(f => selectedIds.includes(f.id));
-                  onCutToClipboard(selectedFiles);
-                  setSelectedIds([]);
-                }}
-                className="px-2.5 py-1.5 bg-white border border-purple-200 hover:bg-purple-100 text-purple-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Cut to clipboard"
-              >
-                <Scissors size={13} />
-                <span>{t.cut}</span>
-              </button>
-            )}
-            {onBatchCopy && (
-              <button
-                onClick={() => {
-                  const selectedFiles = files.filter(f => selectedIds.includes(f.id));
-                  onBatchCopy(selectedFiles);
-                  setSelectedIds([]);
-                }}
-                className="px-2.5 py-1.5 bg-white border border-neutral-200 hover:bg-neutral-100 text-neutral-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Copy selected to SD Card or Folder"
-              >
-                <Copy size={13} />
-                <span>{t.copyTo}</span>
-              </button>
-            )}
-            {onBatchMove && (
-              <button
-                onClick={() => {
-                  const selectedFiles = files.filter(f => selectedIds.includes(f.id));
-                  onBatchMove(selectedFiles);
-                  setSelectedIds([]);
-                }}
-                className="px-2.5 py-1.5 bg-white border border-neutral-200 hover:bg-neutral-100 text-neutral-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Move selected to SD Card or Folder"
-              >
-                <FolderInput size={13} />
-                <span>{t.moveTo}</span>
-              </button>
-            )}
-            {onCompressZip && (
-              <button
-                onClick={() => {
-                  const selectedFiles = files.filter(f => selectedIds.includes(f.id));
-                  onCompressZip(selectedFiles);
-                  setSelectedIds([]);
-                }}
-                className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                title="Create ZIP archive"
-              >
-                <FolderArchive size={13} />
-                <span>{language === 'hi' ? 'ZIP बनाएं' : 'ZIP'}</span>
-              </button>
-            )}
-            <button
-              onClick={handleBatchStar}
-              className="p-1.5 text-neutral-700 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer"
-              title="Add to Starred"
-            >
-              <Star size={16} />
-            </button>
-            <button
-              onClick={handleBatchDelete}
-              className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Trash2 size={13} />
-              <span>{t.delete}</span>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Files List / Grid with Empty State */}
       {categoryFiles.length === 0 ? (
         <div className="bg-white rounded-2xl p-10 text-center border border-neutral-200/90 shadow-2xs">
@@ -817,8 +759,18 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
               onQuickCopy={onQuickCopy}
               onQuickCut={onQuickCut}
               onExtractArchive={onExtractArchive}
+              onCompressZip={onCompressZip}
               language={language}
               isSelectionMode={selectedIds.length > 0}
+              selectedFiles={selectedFiles}
+              onShare={onShare ? (f) => onShare(f) : undefined}
+              onBatchShare={handleBatchShare}
+              onBatchCopy={onBatchCopy ? (sel) => { onBatchCopy(sel); setSelectedIds([]); } : undefined}
+              onBatchMove={onBatchMove ? (sel) => { onBatchMove(sel); setSelectedIds([]); } : undefined}
+              onBatchTrash={handleBatchDelete}
+              onBatchStar={handleBatchStar}
+              onCopyToClipboard={onCopyToClipboard ? (sel) => { onCopyToClipboard(sel); setSelectedIds([]); } : undefined}
+              onCutToClipboard={onCutToClipboard ? (sel) => { onCutToClipboard(sel); setSelectedIds([]); } : undefined}
             />
           ))}
         </div>

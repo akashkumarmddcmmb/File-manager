@@ -48,6 +48,7 @@ interface AudioPlayerModalProps {
   onMinimize: () => void;
   onPlayPause: () => void;
   onSeek: (seconds: number) => void;
+  onSeekBy?: (deltaSeconds: number) => void;
   onNext: () => void;
   onPrev: () => void;
   onToggleShuffle: () => void;
@@ -60,6 +61,7 @@ interface AudioPlayerModalProps {
   onQuickCut?: (file: FileItem) => void;
   onMoveToSafeFolder?: (id: string) => void;
   onSetAsRingtone?: (file: FileItem) => void;
+  onOpenLockScreen?: () => void;
 }
 
 export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
@@ -77,6 +79,7 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
   onMinimize,
   onPlayPause,
   onSeek,
+  onSeekBy,
   onNext,
   onPrev,
   onToggleShuffle,
@@ -89,6 +92,7 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
   onQuickCut,
   onMoveToSafeFolder,
   onSetAsRingtone,
+  onOpenLockScreen,
 }) => {
   const [activeTab, setActiveTab] = useState<'player' | 'playlist' | 'details'>('player');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -153,8 +157,22 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
           )}
         </div>
 
-        {/* Right Action Icons: Share, Star, Three-Dots Menu */}
+        {/* Right Action Icons: Lock Screen, Share, Star, Three-Dots Menu */}
         <div className="flex items-center gap-1 shrink-0 relative" ref={menuRef}>
+          {/* Lock Screen Mode Button */}
+          {onOpenLockScreen && (
+            <button
+              onClick={() => {
+                triggerHapticFeedback();
+                onOpenLockScreen();
+              }}
+              className="p-2 text-emerald-300 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+              title={language === 'hi' ? 'स्क्रीन लॉक प्लेयर' : 'Lock Screen Player'}
+            >
+              <Lock size={20} />
+            </button>
+          )}
+
           {/* Share */}
           <button
             onClick={() => {
@@ -198,6 +216,21 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
           {/* GOOGLE FILES OPTIONS POPUP MENU */}
           {isMenuOpen && (
             <div className="absolute right-0 top-12 w-64 bg-[#1e2026] border border-white/10 rounded-2xl shadow-2xl py-2 z-50 text-neutral-200 animate-in fade-in zoom-in-95 duration-150">
+              {/* Lock Screen Player Mode */}
+              {onOpenLockScreen && (
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    triggerHapticFeedback();
+                    onOpenLockScreen();
+                  }}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-white/10 flex items-center gap-3 text-emerald-400 transition-colors cursor-pointer"
+                >
+                  <Lock size={18} />
+                  <span>{language === 'hi' ? 'स्क्रीन लॉक प्लेयर मोड' : 'Lock Screen Player Mode'}</span>
+                </button>
+              )}
+
               {/* 1. Open with */}
               <button
                 onClick={() => {
@@ -527,20 +560,20 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
             </div>
           </div>
 
-          {/* Core Controls Row (Shuffle, Prev, Play/Pause, Next, Repeat) */}
-          <div className="flex items-center justify-between px-2 sm:px-4">
+          {/* Core Controls Row (Shuffle, Prev, -10s, Play/Pause, +10s, Next, Repeat) */}
+          <div className="flex items-center justify-between px-1 sm:px-4">
             {/* Shuffle */}
             <button
               onClick={() => {
                 triggerHapticFeedback();
                 onToggleShuffle();
               }}
-              className={`p-2.5 rounded-full transition-colors cursor-pointer ${
+              className={`p-2 rounded-full transition-colors cursor-pointer ${
                 isShuffle ? 'text-amber-400 bg-amber-400/10' : 'text-neutral-400 hover:text-white'
               }`}
               title={isShuffle ? 'Shuffle On' : 'Shuffle Off'}
             >
-              <Shuffle size={20} />
+              <Shuffle size={18} />
             </button>
 
             {/* Previous */}
@@ -549,10 +582,27 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
                 triggerHapticFeedback();
                 onPrev();
               }}
-              className="p-2.5 text-neutral-200 hover:text-white rounded-full transition-colors cursor-pointer"
-              title="Previous Track"
+              className="p-2 text-neutral-200 hover:text-white rounded-full transition-colors cursor-pointer"
+              title={language === 'hi' ? 'पिछला गाना' : 'Previous Track'}
             >
-              <SkipBack size={26} />
+              <SkipBack size={24} />
+            </button>
+
+            {/* Seek -10s ("Aage Piche Kar Sakein") */}
+            <button
+              onClick={() => {
+                triggerHapticFeedback();
+                if (onSeekBy) {
+                  onSeekBy(-10);
+                } else {
+                  onSeek(Math.max(0, currentTime - 10));
+                }
+              }}
+              className="p-2 text-neutral-300 hover:text-amber-400 hover:bg-white/5 rounded-full transition-colors cursor-pointer flex flex-col items-center relative"
+              title={language === 'hi' ? '10 सेकंड पीछे' : 'Rewind 10s'}
+            >
+              <RotateCcw size={22} />
+              <span className="text-[8px] font-extrabold absolute top-[10px] text-neutral-300">10</span>
             </button>
 
             {/* Big Round Play / Pause Button */}
@@ -561,7 +611,7 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
                 triggerHapticFeedback();
                 onPlayPause();
               }}
-              className="w-14 h-14 rounded-full bg-white hover:bg-neutral-200 active:scale-95 text-black font-bold flex items-center justify-center shadow-xl transition-all cursor-pointer shrink-0"
+              className="w-14 h-14 rounded-full bg-white hover:bg-neutral-200 active:scale-95 text-black font-bold flex items-center justify-center shadow-xl transition-all cursor-pointer shrink-0 mx-1"
               title={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
@@ -571,16 +621,33 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
               )}
             </button>
 
+            {/* Seek +10s ("Aage Piche Kar Sakein") */}
+            <button
+              onClick={() => {
+                triggerHapticFeedback();
+                if (onSeekBy) {
+                  onSeekBy(10);
+                } else {
+                  onSeek(Math.min(duration || 1000, currentTime + 10));
+                }
+              }}
+              className="p-2 text-neutral-300 hover:text-amber-400 hover:bg-white/5 rounded-full transition-colors cursor-pointer flex flex-col items-center relative"
+              title={language === 'hi' ? '10 सेकंड आगे' : 'Forward 10s'}
+            >
+              <RotateCw size={22} />
+              <span className="text-[8px] font-extrabold absolute top-[10px] text-neutral-300">10</span>
+            </button>
+
             {/* Next */}
             <button
               onClick={() => {
                 triggerHapticFeedback();
                 onNext();
               }}
-              className="p-2.5 text-neutral-200 hover:text-white rounded-full transition-colors cursor-pointer"
-              title="Next Track"
+              className="p-2 text-neutral-200 hover:text-white rounded-full transition-colors cursor-pointer"
+              title={language === 'hi' ? 'अगला गाना' : 'Next Track'}
             >
-              <SkipForward size={26} />
+              <SkipForward size={24} />
             </button>
 
             {/* Repeat */}
@@ -589,12 +656,12 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
                 triggerHapticFeedback();
                 onToggleRepeat();
               }}
-              className={`p-2.5 rounded-full transition-colors cursor-pointer ${
+              className={`p-2 rounded-full transition-colors cursor-pointer ${
                 repeatMode !== 'off' ? 'text-amber-400 bg-amber-400/10' : 'text-neutral-400 hover:text-white'
               }`}
               title={`Repeat: ${repeatMode}`}
             >
-              {repeatMode === 'one' ? <Repeat1 size={20} /> : <Repeat size={20} />}
+              {repeatMode === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
             </button>
           </div>
         </div>

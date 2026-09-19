@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   X,
+  ArrowLeft,
   Settings as SettingsIcon,
   Languages,
   Eye,
@@ -214,42 +215,48 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
-      onClick={onClose}
+      className="fixed inset-0 z-50 bg-[#f4f7f4] dark:bg-[#131814] text-neutral-900 dark:text-neutral-100 flex flex-col w-full h-full overflow-hidden animate-in slide-in-from-bottom duration-200"
     >
-      <div 
-        className="bg-[#f8fafd] rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl border border-neutral-200 flex flex-col max-h-[92vh]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 bg-white border-b border-neutral-100">
+      <div className="w-full max-w-2xl mx-auto h-full flex flex-col">
+        {/* Full Screen Top Header Bar */}
+        <div className="sticky top-0 z-20 flex items-center justify-between px-4 sm:px-6 py-3.5 bg-white/95 dark:bg-[#1f2420]/95 backdrop-blur-md border-b border-neutral-200/80 dark:border-neutral-800 shadow-2xs">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <SettingsIcon size={20} />
-            </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-neutral-900 leading-tight">
-                {t.settings}
-              </h2>
-              <p className="text-[11px] text-neutral-500">
-                Files by Akash Kumar
-              </p>
+            <button
+              onClick={onClose}
+              className="p-2 -ml-2 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors cursor-pointer"
+              title={language === 'hi' ? 'पीछे जाएं' : 'Back'}
+            >
+              <ArrowLeft size={22} />
+            </button>
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                <SettingsIcon size={20} />
+              </div>
+              <div>
+                <h1 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-neutral-100 leading-tight">
+                  {t.settings}
+                </h1>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  Files by Akash Kumar
+                </p>
+              </div>
             </div>
           </div>
+
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-full transition-colors cursor-pointer"
-            title="Close"
+            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs sm:text-sm font-bold rounded-full shadow-xs transition-all cursor-pointer"
           >
-            <X size={20} />
+            {language === 'hi' ? 'संपन्न (Done)' : 'Done'}
           </button>
         </div>
 
         {/* Scrollable Content */}
-        <div className="p-4 sm:p-5 overflow-y-auto space-y-5 flex-1">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 pb-16">
           
           {/* 1. GENERAL & LANGUAGE */}
-          <div className="bg-white rounded-2xl p-4 border border-neutral-200/80 shadow-xs space-y-3.5">
+          <div className="bg-white dark:bg-[#1f2420] rounded-2xl p-4 border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-3.5">
             <div className="flex items-center gap-2 text-xs font-bold text-neutral-500 uppercase tracking-wider">
               <Sliders size={14} className="text-blue-600" />
               <span>{t.general}</span>
@@ -386,7 +393,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           {/* 2. STORAGE & AUTO-CLEAN (DEDICATED OPTION) */}
-          <div className="bg-white rounded-2xl p-4 border border-neutral-200/80 shadow-xs space-y-3.5">
+          <div className="bg-white dark:bg-[#1f2420] rounded-2xl p-4 border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-3.5">
             <div className="flex items-center gap-2 text-xs font-bold text-neutral-500 uppercase tracking-wider">
               <HardDrive size={14} className="text-blue-600" />
               <span>{language === 'hi' ? 'स्टोरेज एवं क्लीनर प्रबंधन' : 'Storage & Auto-Clean'}</span>
@@ -398,17 +405,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onClose();
                 onOpenStorageBreakdown();
               }}
-              className="flex items-center justify-between p-3 rounded-xl bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200/60 transition-colors cursor-pointer"
+              className="flex items-center justify-between p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 hover:bg-blue-100/70 dark:hover:bg-blue-900/40 border border-blue-200/60 dark:border-blue-800/50 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center">
                   <HardDrive size={16} />
                 </div>
                 <div>
-                  <div className="text-xs sm:text-sm font-semibold text-blue-950">
+                  <div className="text-xs sm:text-sm font-semibold text-blue-950 dark:text-blue-100">
                     {t.storageBreakdown}
                   </div>
-                  <div className="text-[11px] text-blue-700">
+                  <div className="text-[11px] text-blue-700 dark:text-blue-300">
                     {formatBytes(storage.used, 0)} {t.used} of {formatBytes(storage.total, 0)}
                   </div>
                 </div>
@@ -419,14 +426,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* Auto Clean Reminder */}
             <div className="flex items-center justify-between py-1">
               <div className="flex items-center gap-3 pr-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
                   <Sparkles size={17} />
                 </div>
                 <div>
-                  <div className="text-xs sm:text-sm font-semibold text-neutral-800">
+                  <div className="text-xs sm:text-sm font-semibold text-neutral-800 dark:text-neutral-100">
                     {t.autoCleanReminder}
                   </div>
-                  <div className="text-[11px] text-neutral-500 leading-tight">
+                  <div className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-tight">
                     {t.autoCleanReminderDesc}
                   </div>
                 </div>
@@ -435,7 +442,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 type="button"
                 onClick={handleToggleAutoClean}
                 className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                  autoCleanAlert ? 'bg-amber-500 justify-end' : 'bg-neutral-300 justify-start'
+                  autoCleanAlert ? 'bg-amber-500 justify-end' : 'bg-neutral-300 dark:bg-neutral-700 justify-start'
                 }`}
               >
                 <span className="w-4 h-4 rounded-full bg-white shadow-xs" />
@@ -444,7 +451,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           {/* 3. SAFE FOLDER & SECURITY */}
-          <div className="bg-white rounded-2xl p-4 border border-neutral-200/80 shadow-xs space-y-3.5">
+          <div className="bg-white dark:bg-[#1f2420] rounded-2xl p-4 border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-3.5">
             <div className="flex items-center gap-2 text-xs font-bold text-neutral-500 uppercase tracking-wider">
               <ShieldCheck size={14} className="text-emerald-600" />
               <span>{t.safeFolderSettings}</span>
@@ -926,17 +933,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-        </div>
-
-        {/* Footer */}
-        <div className="p-3 bg-white border-t border-neutral-100 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
-          >
-            {language === 'hi' ? 'संपन्न (Done)' : 'Done'}
-          </button>
         </div>
       </div>
     </div>

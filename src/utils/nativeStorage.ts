@@ -97,7 +97,8 @@ export async function shareNativeFile(
   title: string, 
   text: string, 
   url?: string,
-  files?: string[]
+  files?: string[],
+  fileItem?: FileItem | FileItem[]
 ): Promise<boolean> {
   await triggerHapticFeedback(ImpactStyle.Medium);
 
@@ -121,6 +122,25 @@ export async function shareNativeFile(
   // 2. Try Web Share API (Mobile Browsers, Chrome, Safari, PWA)
   if (typeof navigator !== 'undefined' && navigator.share) {
     try {
+      // If we have a blob URL, convert it to a File object for native file sharing sheet
+      if (url && (url.startsWith('blob:') || url.startsWith('data:'))) {
+        try {
+          const resp = await fetch(url);
+          const blob = await resp.blob();
+          const fileObj = new File([blob], title || 'shared-file', { type: blob.type || 'application/octet-stream' });
+          if (navigator.canShare && navigator.canShare({ files: [fileObj] })) {
+            await navigator.share({
+              title,
+              text,
+              files: [fileObj]
+            });
+            return true;
+          }
+        } catch (blobErr) {
+          console.warn('Blob share conversion failed:', blobErr);
+        }
+      }
+
       const shareData: ShareData = {
         title,
         text,
@@ -130,28 +150,35 @@ export async function shareNativeFile(
       return true;
     } catch (webShareErr: unknown) {
       if ((webShareErr as Error)?.name === 'AbortError') {
-        return true; // User cancelled the share sheet cleanly
+        return true; // User cancelled cleanly
       }
-      console.warn('Web Share API error:', webShareErr);
+      console.warn('Web Share API error, falling back to Share Modal:', webShareErr);
     }
   }
 
-  // 3. Fallback: Copy to clipboard or trigger download
-  try {
-    if (url && (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('http'))) {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = title || 'shared-file';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      return true;
-    } else if (navigator.clipboard) {
-      await navigator.clipboard.writeText(`${title}\n${text}`);
-      return true;
-    }
-  } catch (fallbackErr) {
-    console.error('All share methods failed:', fallbackErr);
+  // 3. Fallback: Dispatch custom share modal event to open rich Material 3 Share Sheet
+  if (typeof window !== 'undefined') {
+    const filesList = Array.isArray(fileItem) ? fileItem : (fileItem ? [fileItem] : undefined);
+    const primaryFile = filesList && filesList.length > 0 ? filesList[0] : {
+      id: 'shared-' + Date.now(),
+      name: title,
+      size: 1024,
+      type: 'document',
+      updatedAt: new Date().toISOString(),
+      folder: 'Storage',
+      url: url || window.location.href
+    };
+
+    window.dispatchEvent(new CustomEvent('akash_open_share_modal', {
+      detail: {
+        title,
+        text,
+        url,
+        file: primaryFile,
+        files: filesList || [primaryFile]
+      }
+    }));
+    return true;
   }
 
   return false;

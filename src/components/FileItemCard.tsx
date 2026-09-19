@@ -42,9 +42,19 @@ interface FileItemCardProps {
   onMoveTo?: (file: FileItem) => void;
   onQuickCopy?: (file: FileItem) => void;
   onQuickCut?: (file: FileItem) => void;
+  onCompressZip?: (files: FileItem[]) => void;
   onExtractArchive?: (file: FileItem) => void;
   language?: Language;
   isSelectionMode: boolean;
+  selectedFiles?: FileItem[];
+  onShare?: (file: FileItem) => void;
+  onBatchShare?: () => void;
+  onBatchCopy?: (files: FileItem[]) => void;
+  onBatchMove?: (files: FileItem[]) => void;
+  onBatchTrash?: (ids: string[]) => void;
+  onBatchStar?: (ids: string[]) => void;
+  onCopyToClipboard?: (files: FileItem[]) => void;
+  onCutToClipboard?: (files: FileItem[]) => void;
 }
 
 export const FileItemCard: React.FC<FileItemCardProps> = ({
@@ -62,13 +72,286 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
   onMoveTo,
   onQuickCopy,
   onQuickCut,
+  onCompressZip,
   onExtractArchive,
   language = 'en',
   isSelectionMode,
+  selectedFiles,
+  onShare,
+  onBatchShare,
+  onBatchCopy,
+  onBatchMove,
+  onBatchTrash,
+  onBatchStar,
+  onCopyToClipboard,
+  onCutToClipboard,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const isArchive = isArchiveFile(file.name, file.mimeType);
   const archiveBadge = isArchive ? getArchiveBadge(file.name) : null;
+
+  const targetFiles = (isSelected && selectedFiles && selectedFiles.length > 0) ? selectedFiles : [file];
+  const isMulti = targetFiles.length > 1;
+
+  const renderDropdownMenu = () => (
+    <>
+      <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+      <div 
+        className="absolute right-0 mt-1 w-52 sm:w-56 bg-white dark:bg-[#1e231f] border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-xl z-50 py-1.5 text-xs text-neutral-800 dark:text-neutral-200 animate-in fade-in zoom-in-95 max-h-[80vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Selection count indicator if targeting multiple */}
+        {isMulti && (
+          <div className="px-3.5 py-1.5 bg-blue-50/80 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 font-bold border-b border-blue-100 dark:border-blue-900/40 mb-1 flex items-center justify-between">
+            <span>{language === 'hi' ? `${targetFiles.length} फ़ाइलें चुनी गईं` : `${targetFiles.length} files selected`}</span>
+          </div>
+        )}
+
+        {/* 1. Extract Archive (if single archive file) */}
+        {!isMulti && isArchive && onExtractArchive && (
+          <button
+            onClick={() => { setShowMenu(false); onExtractArchive(file); }}
+            className="w-full text-left px-3.5 py-2 hover:bg-amber-100/70 dark:hover:bg-amber-950/50 flex items-center gap-2.5 font-bold text-amber-900 dark:text-amber-200 bg-amber-50/80 dark:bg-amber-950/30 transition-colors cursor-pointer"
+          >
+            <FolderArchive size={15} className="text-amber-600 dark:text-amber-400 shrink-0" />
+            <span>{language === 'hi' ? 'अनज़िप / एक्सट्रैक्ट करें' : 'Extract Archive'}</span>
+          </button>
+        )}
+
+        {/* 2. Open / Preview (if single file) */}
+        {!isMulti && (
+          <button
+            onClick={() => { setShowMenu(false); onOpenPreview(file); }}
+            className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 font-medium text-neutral-800 dark:text-neutral-200 transition-colors cursor-pointer"
+          >
+            {file.type === 'audio' ? <Music size={15} className="text-amber-500 shrink-0" /> : file.type === 'video' ? <Film size={15} className="text-rose-500 shrink-0" /> : file.type === 'document' ? <FileText size={15} className="text-emerald-500 shrink-0" /> : isArchive ? <FolderArchive size={15} className="text-amber-600 shrink-0" /> : <Info size={15} className="shrink-0 text-neutral-500" />}
+            <span>
+              {language === 'hi'
+                ? (file.type === 'audio' ? 'गाना चलाएं' : file.type === 'video' ? 'वीडियो देखें' : file.type === 'document' ? 'दस्तावेज़ पढ़ें' : isArchive ? 'आर्काइव देखें' : 'फ़ाइल खोलें')
+                : (file.type === 'audio' ? 'Play Song' : file.type === 'video' ? 'Play Video' : file.type === 'document' ? 'Read Document' : isArchive ? 'Inspect Archive' : 'Open Preview')}
+            </span>
+          </button>
+        )}
+
+        {/* 3. Open in Phone App (if single file with url) */}
+        {!isMulti && file.url && (
+          <button
+            onClick={() => { 
+              setShowMenu(false); 
+              openRealFile(file.url!);
+            }}
+            className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-emerald-700 dark:text-emerald-400 font-medium transition-colors cursor-pointer"
+          >
+            <ExternalLink size={15} className="shrink-0" />
+            <span>{language === 'hi' ? 'फ़ोन ऐप में खोलें' : 'Open in Phone App'}</span>
+          </button>
+        )}
+
+        {/* 4. SHARE (शेयर करें) */}
+        <button
+          onClick={() => { 
+            setShowMenu(false); 
+            if (isMulti && onBatchShare) {
+              onBatchShare();
+            } else if (isMulti) {
+              const urls = targetFiles.map(f => f.url).filter(Boolean) as string[];
+              const names = targetFiles.map(f => f.name).join(', ');
+              shareNativeFile(`${targetFiles.length} files`, `Sharing: ${names}`, urls[0], urls, targetFiles);
+            } else if (onShare) {
+              onShare(file);
+            } else {
+              shareNativeFile(file.name, `Sharing ${file.name} (${formatBytes(file.size)})`, file.url, undefined, file);
+            }
+          }}
+          className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-blue-600 dark:text-blue-400 font-medium transition-colors cursor-pointer"
+        >
+          <Share2 size={15} className="shrink-0" />
+          <span>
+            {isMulti 
+              ? (language === 'hi' ? `शेयर करें (${targetFiles.length})` : `Share (${targetFiles.length})`) 
+              : (language === 'hi' ? 'शेयर करें' : 'Share')}
+          </span>
+        </button>
+
+        <div className="my-1 border-t border-neutral-100 dark:border-neutral-800" />
+
+        {/* 5. COPY (कॉपी करें) */}
+        {(onCopyToClipboard || onQuickCopy) && (
+          <button
+            onClick={() => { 
+              setShowMenu(false); 
+              if (onCopyToClipboard) {
+                onCopyToClipboard(targetFiles);
+              } else if (onQuickCopy) {
+                onQuickCopy(file);
+              }
+            }}
+            className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-neutral-800 dark:text-neutral-200 font-medium transition-colors cursor-pointer"
+          >
+            <Copy size={15} className="text-blue-600 dark:text-blue-400 shrink-0" />
+            <span>
+              {isMulti 
+                ? (language === 'hi' ? `कॉपी करें (${targetFiles.length})` : `Copy (${targetFiles.length})`) 
+                : (language === 'hi' ? 'कॉपी करें' : 'Copy')}
+            </span>
+          </button>
+        )}
+
+        {/* 6. CUT (कट (यहाँ से हटाएँ)) */}
+        {(onCutToClipboard || onQuickCut) && (
+          <button
+            onClick={() => { 
+              setShowMenu(false); 
+              if (onCutToClipboard) {
+                onCutToClipboard(targetFiles);
+              } else if (onQuickCut) {
+                onQuickCut(file);
+              }
+            }}
+            className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-neutral-800 dark:text-neutral-200 font-medium transition-colors cursor-pointer"
+          >
+            <Scissors size={15} className="text-purple-600 dark:text-purple-400 shrink-0" />
+            <span>
+              {isMulti 
+                ? (language === 'hi' ? `कट (यहाँ से हटाएँ) (${targetFiles.length})` : `Cut (${targetFiles.length})`) 
+                : (language === 'hi' ? 'कट (यहाँ से हटाएँ)' : 'Cut (Move)')}
+            </span>
+          </button>
+        )}
+
+        {/* 7. COPY TO... (कॉपी करें...) */}
+        {(onBatchCopy || onCopyTo) && (
+          <button
+            onClick={() => { 
+              setShowMenu(false); 
+              if (isMulti && onBatchCopy) {
+                onBatchCopy(targetFiles);
+              } else if (onCopyTo) {
+                onCopyTo(file);
+              }
+            }}
+            className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-neutral-800 dark:text-neutral-200 font-medium transition-colors cursor-pointer"
+          >
+            <FolderInput size={15} className="text-blue-600 dark:text-blue-400 shrink-0" />
+            <span>{language === 'hi' ? 'कॉपी करें...' : 'Copy to...'}</span>
+          </button>
+        )}
+
+        {/* 8. MOVE TO... (यहाँ ले जाएँ...) */}
+        {(onBatchMove || onMoveTo) && (
+          <button
+            onClick={() => { 
+              setShowMenu(false); 
+              if (isMulti && onBatchMove) {
+                onBatchMove(targetFiles);
+              } else if (onMoveTo) {
+                onMoveTo(file);
+              }
+            }}
+            className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-neutral-800 dark:text-neutral-200 font-medium transition-colors cursor-pointer"
+          >
+            <FolderInput size={15} className="text-purple-600 dark:text-purple-400 shrink-0" />
+            <span>{language === 'hi' ? 'यहाँ ले जाएँ...' : 'Move to...'}</span>
+          </button>
+        )}
+
+        {/* 9. ZIP ARCHIVE (ZIP बनाएं) */}
+        {onCompressZip && (
+          <button
+            onClick={() => { 
+              setShowMenu(false); 
+              onCompressZip(targetFiles);
+            }}
+            className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-neutral-800 dark:text-neutral-200 font-medium transition-colors cursor-pointer"
+          >
+            <FolderArchive size={15} className="text-amber-600 dark:text-amber-400 shrink-0" />
+            <span>
+              {isMulti 
+                ? (language === 'hi' ? `ZIP बनाएं (${targetFiles.length})` : `Create ZIP (${targetFiles.length})`) 
+                : (language === 'hi' ? 'ZIP बनाएं' : 'Create ZIP')}
+            </span>
+          </button>
+        )}
+
+        <div className="my-1 border-t border-neutral-100 dark:border-neutral-800" />
+
+        {/* 10. STAR (स्टार मार्क करें / हटाएं) */}
+        <button
+          onClick={() => { 
+            setShowMenu(false); 
+            if (isMulti && onBatchStar) {
+              onBatchStar(targetFiles.map(f => f.id));
+            } else {
+              onToggleStar(file.id);
+            }
+          }}
+          className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-neutral-800 dark:text-neutral-200 transition-colors cursor-pointer"
+        >
+          <Star size={15} className={`shrink-0 ${file.isStarred ? 'fill-amber-400 text-amber-400' : 'text-neutral-400'}`} />
+          <span>
+            {file.isStarred 
+              ? (language === 'hi' ? 'स्टार हटाएं' : 'Remove from Starred') 
+              : (language === 'hi' ? 'स्टार मार्क करें' : 'Add to Starred')}
+          </span>
+        </button>
+
+        {/* 11. SAFE FOLDER (सेफ़ फ़ोल्डर में डालें) */}
+        {onMoveToSafe && !file.isSafe && (
+          <button
+            onClick={() => { setShowMenu(false); onMoveToSafe(file.id); }}
+            className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-neutral-800 dark:text-neutral-200 transition-colors cursor-pointer"
+          >
+            <Shield size={15} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span>{language === 'hi' ? 'सेफ़ फ़ोल्डर में डालें' : 'Move to Safe Folder'}</span>
+          </button>
+        )}
+
+        {/* 12. RENAME (नाम बदलें) */}
+        {!isMulti && onRename && (
+          <button
+            onClick={() => { setShowMenu(false); onRename(file); }}
+            className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-neutral-800 dark:text-neutral-200 transition-colors cursor-pointer"
+          >
+            <Edit2 size={15} className="text-neutral-500 shrink-0" />
+            <span>{language === 'hi' ? 'नाम बदलें' : 'Rename'}</span>
+          </button>
+        )}
+
+        {/* 13. FILE DETAILS (फ़ाइल विवरण) */}
+        {!isMulti && (
+          <button
+            onClick={() => { setShowMenu(false); onShowInfo(file); }}
+            className="w-full text-left px-3.5 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center gap-2.5 text-neutral-800 dark:text-neutral-200 transition-colors cursor-pointer"
+          >
+            <Info size={15} className="text-neutral-500 shrink-0" />
+            <span>{language === 'hi' ? 'फ़ाइल विवरण' : 'File details'}</span>
+          </button>
+        )}
+
+        <div className="my-1 border-t border-neutral-100 dark:border-neutral-800" />
+
+        {/* 14. DELETE / TRASH (हटाएं / ट्रैश में डालें) */}
+        <button
+          onClick={() => { 
+            setShowMenu(false); 
+            if (isMulti && onBatchTrash) {
+              onBatchTrash(targetFiles.map(f => f.id));
+            } else {
+              onMoveToTrash(file.id);
+            }
+          }}
+          className="w-full text-left px-3.5 py-2 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center gap-2.5 font-medium transition-colors cursor-pointer"
+        >
+          <Trash2 size={15} className="shrink-0" />
+          <span>
+            {isMulti 
+              ? (language === 'hi' ? `हटाएं (${targetFiles.length})` : `Delete (${targetFiles.length})`) 
+              : (language === 'hi' ? 'हटाएं (ट्रैश में डालें)' : 'Move to Trash')}
+          </span>
+        </button>
+      </div>
+    </>
+  );
 
   const getFileIcon = () => {
     switch (file.type) {
@@ -176,116 +459,7 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
             <MoreVertical size={16} />
           </button>
 
-          {showMenu && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 mt-1 w-48 bg-white border border-neutral-200 rounded-xl shadow-lg z-50 py-1 text-xs text-neutral-700 animate-in fade-in zoom-in-95">
-                {isArchive && onExtractArchive && (
-                  <button
-                    onClick={() => { setShowMenu(false); onExtractArchive(file); }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-amber-100/70 flex items-center gap-2 font-bold text-amber-900 bg-amber-50"
-                  >
-                    <FolderArchive size={14} className="text-amber-600" />
-                    {language === 'hi' ? 'अनज़िप / एक्सट्रैक्ट करें' : 'Extract Archive'}
-                  </button>
-                )}
-                <button
-                  onClick={() => { setShowMenu(false); onOpenPreview(file); }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 font-medium text-neutral-800"
-                >
-                  {file.type === 'audio' ? <Music size={14} className="text-amber-500" /> : file.type === 'video' ? <Film size={14} className="text-rose-500" /> : file.type === 'document' ? <FileText size={14} className="text-emerald-500" /> : isArchive ? <FolderArchive size={14} className="text-amber-600" /> : <Info size={14} />}
-                  {file.type === 'audio' ? 'Play Song' : file.type === 'video' ? 'Play Video' : file.type === 'document' ? 'Read Document' : isArchive ? 'Inspect Archive' : 'Open Preview'}
-                </button>
-                {file.url && (
-                  <button
-                    onClick={() => { 
-                      setShowMenu(false); 
-                      openRealFile(file.url!);
-                    }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-emerald-700 font-medium"
-                  >
-                    <ExternalLink size={14} /> Open in Phone App
-                  </button>
-                )}
-                <button
-                  onClick={() => { 
-                    setShowMenu(false); 
-                    shareNativeFile(file.name, `Sharing ${file.name} (${formatBytes(file.size)})`, file.url);
-                  }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-blue-600 font-medium"
-                >
-                  <Share2 size={14} /> Share file (Mobile)
-                </button>
-                <button
-                  onClick={() => { setShowMenu(false); onToggleStar(file.id); }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2"
-                >
-                  <Star size={14} className={file.isStarred ? 'fill-amber-400 text-amber-400' : ''} />
-                  {file.isStarred ? 'Remove from Starred' : 'Add to Starred'}
-                </button>
-                {onMoveToSafe && !file.isSafe && (
-                  <button
-                    onClick={() => { setShowMenu(false); onMoveToSafe(file.id); }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2"
-                  >
-                    <Shield size={14} /> Move to Safe Folder
-                  </button>
-                )}
-                {onQuickCopy && (
-                  <button
-                    onClick={() => { setShowMenu(false); onQuickCopy(file); }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-neutral-800 font-medium"
-                  >
-                    <Copy size={14} className="text-blue-600" /> {language === 'hi' ? 'कॉपी करें' : 'Copy'}
-                  </button>
-                )}
-                {onQuickCut && (
-                  <button
-                    onClick={() => { setShowMenu(false); onQuickCut(file); }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-neutral-800 font-medium"
-                  >
-                    <Scissors size={14} className="text-purple-600" /> {language === 'hi' ? 'कट करें (Move)' : 'Cut'}
-                  </button>
-                )}
-                {onCopyTo && (
-                  <button
-                    onClick={() => { setShowMenu(false); onCopyTo(file); }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-neutral-800"
-                  >
-                    <FolderInput size={14} className="text-blue-600" /> {language === 'hi' ? 'यहाँ कॉपी करें...' : 'Copy to...'}
-                  </button>
-                )}
-                {onMoveTo && (
-                  <button
-                    onClick={() => { setShowMenu(false); onMoveTo(file); }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-neutral-800"
-                  >
-                    <FolderInput size={14} className="text-purple-600" /> {language === 'hi' ? 'यहाँ ले जाएँ...' : 'Move to...'}
-                  </button>
-                )}
-                {onRename && (
-                  <button
-                    onClick={() => { setShowMenu(false); onRename(file); }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2"
-                  >
-                    <Edit2 size={14} /> Rename
-                  </button>
-                )}
-                <button
-                  onClick={() => { setShowMenu(false); onShowInfo(file); }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2"
-                >
-                  <Info size={14} /> File details
-                </button>
-                <button
-                  onClick={() => { setShowMenu(false); onMoveToTrash(file.id); }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-rose-50 text-rose-600 flex items-center gap-2 border-t border-neutral-100"
-                >
-                  <Trash2 size={14} /> Move to Trash
-                </button>
-              </div>
-            </>
-          )}
+          {showMenu && renderDropdownMenu()}
         </div>
       </div>
     );
@@ -385,116 +559,7 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
             <MoreVertical size={16} />
           </button>
 
-          {showMenu && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 bottom-full mb-1 w-48 bg-white border border-neutral-200 rounded-xl shadow-lg z-50 py-1 text-xs text-neutral-700 animate-in fade-in zoom-in-95">
-                {isArchive && onExtractArchive && (
-                  <button
-                    onClick={() => { setShowMenu(false); onExtractArchive(file); }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-amber-100/70 flex items-center gap-2 font-bold text-amber-900 bg-amber-50"
-                  >
-                    <FolderArchive size={14} className="text-amber-600" />
-                    {language === 'hi' ? 'अनज़िप / एक्सट्रैक्ट करें' : 'Extract Archive'}
-                  </button>
-                )}
-                <button
-                  onClick={() => { setShowMenu(false); onOpenPreview(file); }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 font-medium text-neutral-800"
-                >
-                  {file.type === 'audio' ? <Music size={14} className="text-amber-500" /> : file.type === 'video' ? <Film size={14} className="text-rose-500" /> : file.type === 'document' ? <FileText size={14} className="text-emerald-500" /> : isArchive ? <FolderArchive size={14} className="text-amber-600" /> : <Info size={14} />}
-                  {file.type === 'audio' ? 'Play Song' : file.type === 'video' ? 'Play Video' : file.type === 'document' ? 'Read Document' : isArchive ? 'Inspect Archive' : 'Open'}
-                </button>
-                {file.url && (
-                  <button
-                    onClick={() => { 
-                      setShowMenu(false); 
-                      openRealFile(file.url!);
-                    }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-emerald-700 font-medium"
-                  >
-                    <ExternalLink size={14} /> Open in Phone App
-                  </button>
-                )}
-                <button
-                  onClick={() => { 
-                    setShowMenu(false); 
-                    shareNativeFile(file.name, `Sharing ${file.name} (${formatBytes(file.size)})`, file.url);
-                  }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-blue-600 font-medium"
-                >
-                  <Share2 size={14} /> Share file (Mobile)
-                </button>
-                <button
-                  onClick={() => { setShowMenu(false); onToggleStar(file.id); }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2"
-                >
-                  <Star size={14} className={file.isStarred ? 'fill-amber-400 text-amber-400' : ''} />
-                  {file.isStarred ? 'Remove from Starred' : 'Add to Starred'}
-                </button>
-                {onMoveToSafe && !file.isSafe && (
-                  <button
-                    onClick={() => { setShowMenu(false); onMoveToSafe(file.id); }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2"
-                  >
-                    <Shield size={14} /> Move to Safe Folder
-                  </button>
-                )}
-                {onQuickCopy && (
-                  <button
-                    onClick={() => { setShowMenu(false); onQuickCopy(file); }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-neutral-800 font-medium"
-                  >
-                    <Copy size={14} className="text-blue-600" /> {language === 'hi' ? 'कॉपी करें' : 'Copy'}
-                  </button>
-                )}
-                {onQuickCut && (
-                  <button
-                    onClick={() => { setShowMenu(false); onQuickCut(file); }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-neutral-800 font-medium"
-                  >
-                    <Scissors size={14} className="text-purple-600" /> {language === 'hi' ? 'कट करें (Move)' : 'Cut'}
-                  </button>
-                )}
-                {onCopyTo && (
-                  <button
-                    onClick={() => { setShowMenu(false); onCopyTo(file); }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-neutral-800"
-                  >
-                    <FolderInput size={14} className="text-blue-600" /> {language === 'hi' ? 'यहाँ कॉपी करें...' : 'Copy to...'}
-                  </button>
-                )}
-                {onMoveTo && (
-                  <button
-                    onClick={() => { setShowMenu(false); onMoveTo(file); }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2 text-neutral-800"
-                  >
-                    <FolderInput size={14} className="text-purple-600" /> {language === 'hi' ? 'यहाँ ले जाएँ...' : 'Move to...'}
-                  </button>
-                )}
-                {onRename && (
-                  <button
-                    onClick={() => { setShowMenu(false); onRename(file); }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2"
-                  >
-                    <Edit2 size={14} /> Rename
-                  </button>
-                )}
-                <button
-                  onClick={() => { setShowMenu(false); onShowInfo(file); }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center gap-2"
-                >
-                  <Info size={14} /> File details
-                </button>
-                <button
-                  onClick={() => { setShowMenu(false); onMoveToTrash(file.id); }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-rose-50 text-rose-600 flex items-center gap-2 border-t border-neutral-100"
-                >
-                  <Trash2 size={14} /> Move to Trash
-                </button>
-              </div>
-            </>
-          )}
+          {showMenu && renderDropdownMenu()}
         </div>
       </div>
     </div>

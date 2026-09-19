@@ -158,6 +158,10 @@ export const translations = {
     feedbackSheet: "Developer Sheet & History",
     mustSignInToFeedback: "Sign in with your account to submit feedback and track responses",
     feedbackSubmittedSuccess: "Feedback sent successfully to developer Akash Kumar",
+    lockScreenPlayer: "Lock Screen Player",
+    lockScreenActive: "Lock screen media controls are active",
+    rewind10s: "Rewind 10 seconds",
+    forward10s: "Forward 10 seconds",
   },
   hi: {
     appName: "फ़ाइलें",
@@ -318,5 +322,9 @@ export const translations = {
     feedbackSheet: "डेवलपर शीट व सबमिशन हिस्ट्री",
     mustSignInToFeedback: "फ़ीडबैक सबमिट करने व डेवलपर रिस्पॉन्स पाने के लिए अकाउंट में साइन इन करें",
     feedbackSubmittedSuccess: "फ़ीडबैक सफलतापूर्वक डेवलपर आकाश कुमार को प्रेषित किया गया",
+    lockScreenPlayer: "स्क्रीन लॉक प्लेयर",
+    lockScreenActive: "स्क्रीन लॉक मीडिया कंट्रोल सक्रिय हैं",
+    rewind10s: "10 सेकंड पीछे करें",
+    forward10s: "10 सेकंड आगे करें",
   }
 };

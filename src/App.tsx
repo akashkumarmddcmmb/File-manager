@@ -25,6 +25,7 @@ import { FolderView } from './components/FolderView';
 import { FileViewerModal } from './components/FileViewerModal';
 import { AudioPlayerModal } from './components/AudioPlayerModal';
 import { MiniMusicPlayer } from './components/MiniMusicPlayer';
+import { LockScreenPlayerModal } from './components/LockScreenPlayerModal';
 import { VideoPlayerModal } from './components/VideoPlayerModal';
 import { PdfDocumentViewerModal } from './components/PdfDocumentViewerModal';
 import { SafeFolderModal } from './components/SafeFolderModal';
@@ -41,6 +42,7 @@ import { ZipCompressModal } from './components/ZipCompressModal';
 import { LegalModal } from './components/LegalModal';
 import { FeedbackModal } from './components/FeedbackModal';
 import { NotificationShade } from './components/NotificationShade';
+import { ShareModal } from './components/ShareModal';
 import { FloatingNotificationBar } from './components/FloatingNotificationBar';
 import { FileItemCard } from './components/FileItemCard';
 import { translations } from './utils/translations';
@@ -71,6 +73,8 @@ import {
   postNativeSystemNotification,
   cancelNativeNotification
 } from './utils/nativeNotifications';
+import { generateMelodyWavBlob } from './utils/audioSynthesizer';
+import { syncMediaSession, updateMediaSessionPosition } from './utils/mediaSessionManager';
 
 const STORAGE_FILES_KEY = 'google_files_app_files_v1';
 const STORAGE_FOLDERS_KEY = 'google_files_app_folders_v1';
@@ -368,6 +372,40 @@ export default function App() {
     );
   };
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+  const [shareModalFile, setShareModalFile] = useState<FileItem | null>(null);
+  const [shareModalFiles, setShareModalFiles] = useState<FileItem[]>([]);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
+  // Helper to open share modal with file or files
+  const handleShareFile = (target: FileItem | FileItem[]) => {
+    if (Array.isArray(target)) {
+      setShareModalFiles(target);
+      setShareModalFile(target[0] || null);
+    } else {
+      setShareModalFile(target);
+      setShareModalFiles([target]);
+    }
+    setIsShareModalOpen(true);
+  };
+
+  // Listen to global share modal requests
+  useEffect(() => {
+    const handleOpenShareModal = (e: Event) => {
+      const custom = e as CustomEvent;
+      if (custom.detail) {
+        if (custom.detail.files && custom.detail.files.length > 0) {
+          setShareModalFiles(custom.detail.files);
+          setShareModalFile(custom.detail.files[0]);
+        } else if (custom.detail.file) {
+          setShareModalFile(custom.detail.file);
+          setShareModalFiles([custom.detail.file]);
+        }
+        setIsShareModalOpen(true);
+      }
+    };
+    window.addEventListener('akash_open_share_modal', handleOpenShareModal);
+    return () => window.removeEventListener('akash_open_share_modal', handleOpenShareModal);
+  }, []);
   const [isSafeFolderOpen, setIsSafeFolderOpen] = useState(false);
   const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [isStorageBreakdownOpen, setIsStorageBreakdownOpen] = useState(false);
@@ -466,16 +504,86 @@ export default function App() {
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('all');
   const [audioPlaybackSpeed, setAudioPlaybackSpeed] = useState<number>(1);
+  const [isLockScreenModalOpen, setIsLockScreenModalOpen] = useState(false);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
+
+  // Keep ref synchronized with latest audio state so OS Lock Screen handlers always have fresh closures
+  const audioTrackStateRef = useRef({
+    currentAudio,
+    audioPlaylist,
+    isShuffle,
+    repeatMode,
+    audioPlaybackSpeed,
+    audioDuration,
+    audioCurrentTime,
+  });
+
+  useEffect(() => {
+    audioTrackStateRef.current = {
+      currentAudio,
+      audioPlaylist,
+      isShuffle,
+      repeatMode,
+      audioPlaybackSpeed,
+      audioDuration,
+      audioCurrentTime,
+    };
+  }, [currentAudio, audioPlaylist, isShuffle, repeatMode, audioPlaybackSpeed, audioDuration, audioCurrentTime]);
 
   const [videoPlayerFile, setVideoPlayerFile] = useState<FileItem | null>(null);
   const [pdfViewerFile, setPdfViewerFile] = useState<FileItem | null>(null);
+
+  // Seek forward / backward by delta seconds ("Aage Piche Kar Sako")
+  const handleSeekBy = (deltaSeconds: number) => {
+    if (!audioElementRef.current) return;
+    const dur = audioDuration || audioElementRef.current.duration || 100;
+    const current = audioElementRef.current.currentTime || audioCurrentTime;
+    const target = Math.max(0, Math.min(dur, current + deltaSeconds));
+    audioElementRef.current.currentTime = target;
+    setAudioCurrentTime(target);
+    updateMediaSessionPosition(target, dur, audioPlaybackSpeed || 1);
+  };
+
+  // Seek to specific absolute seconds
+  const handleSeekTo = (targetSeconds: number) => {
+    if (!audioElementRef.current) return;
+    const dur = audioDuration || audioElementRef.current.duration || 100;
+    const valid = Math.max(0, Math.min(dur, targetSeconds));
+    audioElementRef.current.currentTime = valid;
+    setAudioCurrentTime(valid);
+    updateMediaSessionPosition(valid, dur, audioPlaybackSpeed || 1);
+  };
+
+  const handleNextTrack = () => {
+    const { currentAudio: cur, audioPlaylist: list, isShuffle: shuffle } = audioTrackStateRef.current;
+    if (!cur || list.length === 0) return;
+    let nextIndex = 0;
+    if (shuffle) {
+      nextIndex = Math.floor(Math.random() * list.length);
+    } else {
+      const currentIndex = list.findIndex(t => t.id === cur.id);
+      nextIndex = (currentIndex + 1) % list.length;
+    }
+    setCurrentAudio(list[nextIndex]);
+    setIsAudioPlaying(true);
+  };
+
+  const handlePrevTrack = () => {
+    const { currentAudio: cur, audioPlaylist: list } = audioTrackStateRef.current;
+    if (!cur || list.length === 0) return;
+    const currentIndex = list.findIndex(t => t.id === cur.id);
+    const prevIndex = (currentIndex - 1 + list.length) % list.length;
+    setCurrentAudio(list[prevIndex]);
+    setIsAudioPlaying(true);
+  };
 
   // Sync background HTML audio element with currentAudio & playback rate
   useEffect(() => {
     if (!audioElementRef.current) return;
     if (currentAudio) {
-      const src = resolveMediaSrc(currentAudio.url);
+      const initialSrc = resolveMediaSrc(currentAudio.url);
+      // If no valid src or if demo audio is offline, prepare melodic synth audio
+      const src = initialSrc || generateMelodyWavBlob(currentAudio.name);
       if (src) {
         audioElementRef.current.src = src;
         audioElementRef.current.playbackRate = audioPlaybackSpeed;
@@ -483,8 +591,14 @@ export default function App() {
           const promise = audioElementRef.current.play();
           if (promise !== undefined) {
             promise.catch(e => {
-              console.warn('Audio play error:', e);
-              setIsAudioPlaying(false);
+              console.warn('Audio play error, falling back to synthesizer:', e);
+              const fallback = generateMelodyWavBlob(currentAudio.name);
+              if (audioElementRef.current && audioElementRef.current.src !== fallback) {
+                audioElementRef.current.src = fallback;
+                audioElementRef.current.play().catch(() => setIsAudioPlaying(false));
+              } else {
+                setIsAudioPlaying(false);
+              }
             });
           }
         }
@@ -508,7 +622,13 @@ export default function App() {
       if (promise !== undefined) {
         promise.catch(e => {
           console.warn('Audio play error:', e);
-          setIsAudioPlaying(false);
+          const fallback = generateMelodyWavBlob(currentAudio.name);
+          if (audioElementRef.current && audioElementRef.current.src !== fallback) {
+            audioElementRef.current.src = fallback;
+            audioElementRef.current.play().catch(() => setIsAudioPlaying(false));
+          } else {
+            setIsAudioPlaying(false);
+          }
         });
       }
     } else {
@@ -516,7 +636,7 @@ export default function App() {
     }
   }, [isAudioPlaying]);
 
-  // Sync notifications with Media Playback (Audio)
+  // Sync notifications with Media Playback (Audio) & W3C MediaSession for Lock Screen Controls
   useEffect(() => {
     if (currentAudio) {
       addOrUpdateNotification({
@@ -531,7 +651,7 @@ export default function App() {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         mediaDetails: {
           title: currentAudio.name,
-          artist: 'Files by Akash Kumar Audio',
+          artist: 'Files by Google',
           isPlaying: isAudioPlaying,
           thumbnail: currentAudio.thumbnail,
           duration: audioDuration,
@@ -539,49 +659,56 @@ export default function App() {
         },
       });
 
-      // Sync OS MediaSession API for Android Notification Shade & Lockscreen Media Controls
-      if (typeof window !== 'undefined' && 'mediaSession' in navigator) {
-        try {
-          navigator.mediaSession.metadata = new MediaMetadata({
-            title: currentAudio.name,
-            artist: 'Files by Akash Kumar',
-            album: currentAudio.folder || 'Music',
-            artwork: currentAudio.thumbnail 
-              ? [{ src: currentAudio.thumbnail, sizes: '512x512', type: 'image/jpeg' }]
-              : []
-          });
+      // Post persistent status notification to Android status bar / shade
+      postNativeSystemNotification({
+        id: 'media-audio-player',
+        title: currentAudio.name.replace(/\.[^/.]+$/, ''),
+        body: isAudioPlaying 
+          ? (language === 'hi' ? '▶ बज रहा है • लॉकस्क्रीन विजेट सक्रिय है' : '▶ Playing • Lock screen controls active')
+          : (language === 'hi' ? '⏸ रुका हुआ है' : '⏸ Paused'),
+        channelId: 'files_media',
+        extra: {
+          audioId: currentAudio.id,
+          isPlaying: isAudioPlaying,
+        },
+      });
 
-          navigator.mediaSession.setActionHandler('play', () => setIsAudioPlaying(true));
-          navigator.mediaSession.setActionHandler('pause', () => setIsAudioPlaying(false));
-          navigator.mediaSession.setActionHandler('previoustrack', () => handlePrevTrack());
-          navigator.mediaSession.setActionHandler('nexttrack', () => handleNextTrack());
-          navigator.mediaSession.setActionHandler('seekto', (details) => {
-            if (details.seekTime !== undefined && audioElementRef.current) {
-              audioElementRef.current.currentTime = details.seekTime;
-              setAudioCurrentTime(details.seekTime);
-            }
-          });
-
-          if ('setPositionState' in navigator.mediaSession && audioDuration > 0 && isFinite(audioDuration)) {
-            try {
-              navigator.mediaSession.setPositionState({
-                duration: audioDuration,
-                playbackRate: audioPlaybackSpeed || 1,
-                position: Math.min(audioCurrentTime, audioDuration),
-              });
-            } catch (e) {}
+      // Synchronize W3C MediaSession API for OS Lockscreen Media Controls & Bluetooth
+      syncMediaSession({
+        file: currentAudio,
+        isPlaying: isAudioPlaying,
+        duration: audioDuration,
+        currentTime: audioCurrentTime,
+        playbackRate: audioPlaybackSpeed || 1,
+        onPlay: () => setIsAudioPlaying(true),
+        onPause: () => setIsAudioPlaying(false),
+        onNext: () => handleNextTrack(),
+        onPrev: () => handlePrevTrack(),
+        onSeekTo: (secs) => handleSeekTo(secs),
+        onSeekBy: (delta) => handleSeekBy(delta),
+        onStop: () => {
+          setIsAudioPlaying(false);
+          if (audioElementRef.current) {
+            audioElementRef.current.pause();
+            audioElementRef.current.currentTime = 0;
           }
-        } catch (err) {
-          console.warn('MediaSession error:', err);
-        }
-      }
+        },
+      });
     } else {
       dismissNotification('media-audio-player');
-      if (typeof window !== 'undefined' && 'mediaSession' in navigator) {
-        try {
-          navigator.mediaSession.metadata = null;
-        } catch (e) {}
-      }
+      cancelNativeNotification('media-audio-player');
+      syncMediaSession({
+        file: null,
+        isPlaying: false,
+        duration: 0,
+        currentTime: 0,
+        onPlay: () => {},
+        onPause: () => {},
+        onNext: () => {},
+        onPrev: () => {},
+        onSeekTo: () => {},
+        onSeekBy: () => {},
+      });
     }
   }, [currentAudio?.id, currentAudio?.name, isAudioPlaying, language]);
 
@@ -606,27 +733,6 @@ export default function App() {
       dismissNotification('media-video-player');
     }
   }, [videoPlayerFile, language]);
-
-  const handleNextTrack = () => {
-    if (!currentAudio || audioPlaylist.length === 0) return;
-    let nextIndex = 0;
-    if (isShuffle) {
-      nextIndex = Math.floor(Math.random() * audioPlaylist.length);
-    } else {
-      const currentIndex = audioPlaylist.findIndex(t => t.id === currentAudio.id);
-      nextIndex = (currentIndex + 1) % audioPlaylist.length;
-    }
-    setCurrentAudio(audioPlaylist[nextIndex]);
-    setIsAudioPlaying(true);
-  };
-
-  const handlePrevTrack = () => {
-    if (!currentAudio || audioPlaylist.length === 0) return;
-    const currentIndex = audioPlaylist.findIndex(t => t.id === currentAudio.id);
-    const prevIndex = (currentIndex - 1 + audioPlaylist.length) % audioPlaylist.length;
-    setCurrentAudio(audioPlaylist[prevIndex]);
-    setIsAudioPlaying(true);
-  };
 
   const [archiveExtractFile, setArchiveExtractFile] = useState<FileItem | null>(null);
   const [zipCompressFiles, setZipCompressFiles] = useState<FileItem[]>([]);
@@ -1682,6 +1788,7 @@ export default function App() {
             onQuickCut={handleQuickCut}
             onExtractArchive={handleExtractArchive}
             onCompressZip={handleCompressFiles}
+            onShare={handleShareFile}
             onRegisterSelectionClearer={(clearer) => { selectionClearerRef.current = clearer; }}
           />
         ) : selectedCategory ? (
@@ -1711,6 +1818,7 @@ export default function App() {
             onQuickCut={handleQuickCut}
             onExtractArchive={handleExtractArchive}
             onCompressZip={handleCompressFiles}
+            onShare={handleShareFile}
             onRegisterSelectionClearer={(clearer) => { selectionClearerRef.current = clearer; }}
             onRefreshStorage={loadRealDeviceStorage}
           />
@@ -1843,6 +1951,7 @@ export default function App() {
         onClose={() => setPreviewFile(null)}
         onToggleStar={handleToggleStar}
         onMoveToTrash={handleMoveToTrash}
+        onShare={handleShareFile}
         onExtractArchive={(file) => {
           setPreviewFile(null);
           handleExtractArchive(file);
@@ -1964,17 +2073,31 @@ export default function App() {
       {/* Hidden Global Audio Element for Background Music Playback */}
       <audio
         ref={audioElementRef}
+        preload="auto"
+        playsInline={true}
         onError={() => {
+          if (currentAudio && audioElementRef.current) {
+            const fallback = generateMelodyWavBlob(currentAudio.name);
+            if (audioElementRef.current.src !== fallback) {
+              audioElementRef.current.src = fallback;
+              audioElementRef.current.play().catch(() => setIsAudioPlaying(false));
+              return;
+            }
+          }
           setIsAudioPlaying(false);
         }}
         onTimeUpdate={() => {
           if (audioElementRef.current) {
-            setAudioCurrentTime(audioElementRef.current.currentTime);
+            const cur = audioElementRef.current.currentTime;
+            setAudioCurrentTime(cur);
+            updateMediaSessionPosition(cur, audioDuration || audioElementRef.current.duration, audioPlaybackSpeed || 1);
           }
         }}
         onLoadedMetadata={() => {
           if (audioElementRef.current) {
-            setAudioDuration(audioElementRef.current.duration);
+            const dur = audioElementRef.current.duration;
+            setAudioDuration(dur);
+            updateMediaSessionPosition(audioElementRef.current.currentTime, dur, audioPlaybackSpeed || 1);
           }
         }}
         onEnded={() => {
@@ -1999,6 +2122,8 @@ export default function App() {
           onExpand={() => setIsAudioPlayerOpen(true)}
           onPlayPause={() => setIsAudioPlaying(!isAudioPlaying)}
           onNext={handleNextTrack}
+          onPrev={handlePrevTrack}
+          onOpenLockScreen={() => setIsLockScreenModalOpen(true)}
           onClose={() => {
             setIsAudioPlaying(false);
             setCurrentAudio(null);
@@ -2021,12 +2146,9 @@ export default function App() {
         onClose={() => setIsAudioPlayerOpen(false)}
         onMinimize={() => setIsAudioPlayerOpen(false)}
         onPlayPause={() => setIsAudioPlaying(!isAudioPlaying)}
-        onSeek={(secs) => {
-          if (audioElementRef.current) {
-            audioElementRef.current.currentTime = secs;
-            setAudioCurrentTime(secs);
-          }
-        }}
+        onSeek={handleSeekTo}
+        onSeekBy={handleSeekBy}
+        onOpenLockScreen={() => setIsLockScreenModalOpen(true)}
         onNext={handleNextTrack}
         onPrev={handlePrevTrack}
         onToggleShuffle={() => setIsShuffle(!isShuffle)}
@@ -2048,6 +2170,28 @@ export default function App() {
         }}
         onSetAsRingtone={(f) => {
           showToast(language === 'hi' ? `"${f.name}" रिंगटोन सेट की गई 🔔` : `"${f.name}" set as ringtone 🔔`);
+        }}
+      />
+
+      {/* Real-time Android Lock Screen Media Player */}
+      <LockScreenPlayerModal
+        isOpen={isLockScreenModalOpen}
+        file={currentAudio}
+        isPlaying={isAudioPlaying}
+        currentTime={audioCurrentTime}
+        duration={audioDuration}
+        isShuffle={isShuffle}
+        repeatMode={repeatMode}
+        language={language}
+        onClose={() => setIsLockScreenModalOpen(false)}
+        onPlayPause={() => setIsAudioPlaying(!isAudioPlaying)}
+        onSeek={handleSeekTo}
+        onSeekBy={handleSeekBy}
+        onNext={handleNextTrack}
+        onPrev={handlePrevTrack}
+        onToggleShuffle={() => setIsShuffle(!isShuffle)}
+        onToggleRepeat={() => {
+          setRepeatMode(prev => prev === 'off' ? 'all' : prev === 'all' ? 'one' : 'off');
         }}
       />
 
@@ -2161,6 +2305,19 @@ export default function App() {
         onNextTrack={handleNextTrack}
         onPrevTrack={handlePrevTrack}
         language={language}
+      />
+
+      {/* Material 3 Universal Share Sheet Modal */}
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        file={shareModalFile}
+        files={shareModalFiles}
+        language={language}
+        showToast={showToast}
+        onOpenQuickShare={(_selectedFiles) => {
+          setActiveTab('share');
+        }}
       />
     </div>
   );
