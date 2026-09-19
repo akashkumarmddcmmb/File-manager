@@ -47,6 +47,7 @@ import { translations } from './utils/translations';
 import { isArchiveFile } from './utils/archiveUtils';
 import { formatBytes } from './utils/storage';
 import { isDemoFile, filterOutDemoFiles, hasDemoFiles, STORAGE_HIDE_DEMO_KEY } from './utils/demoData';
+import { resolveMediaSrc } from './utils/mediaUtils';
 import { AppNotification } from './types';
 import { UploadCloud, CheckCircle2, ClipboardPaste, X } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
@@ -67,7 +68,8 @@ import { saveFileBlob } from './utils/idbStorage';
 import { 
   initNotificationChannels, 
   requestNativeNotificationPermission, 
-  postNativeSystemNotification 
+  postNativeSystemNotification,
+  cancelNativeNotification
 } from './utils/nativeNotifications';
 
 const STORAGE_FILES_KEY = 'google_files_app_files_v1';
@@ -321,8 +323,9 @@ export default function App() {
       return [notif, ...prev];
     });
 
-    // Also dispatch to Android Native Status Bar / Notification shade
+    // Also dispatch to Android Native Status Bar / Notification shade using deterministic ID (replaces existing notification)
     postNativeSystemNotification({
+      id: notif.id,
       title: notif.title,
       body: notif.description,
       channelId: notif.type === 'media-playback' ? 'files_media' : notif.type === 'file-operation' || notif.type === 'transfer' ? 'files_transfers' : 'files_general',
@@ -332,6 +335,7 @@ export default function App() {
 
   const dismissNotification = (id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
+    cancelNativeNotification(id).catch(e => console.warn(e));
   };
 
   const clearAllNotifications = () => {
@@ -403,13 +407,17 @@ export default function App() {
   useEffect(() => {
     if (!audioElementRef.current) return;
     if (currentAudio) {
-      const src = currentAudio.url && currentAudio.url.startsWith('/')
-        ? Capacitor.convertFileSrc(currentAudio.url)
-        : currentAudio.url;
+      const src = resolveMediaSrc(currentAudio.url);
       if (src) {
         audioElementRef.current.src = src;
         if (isAudioPlaying) {
-          audioElementRef.current.play().catch(e => console.warn('Audio play error:', e));
+          const promise = audioElementRef.current.play();
+          if (promise !== undefined) {
+            promise.catch(e => {
+              console.warn('Audio play error:', e);
+              setIsAudioPlaying(false);
+            });
+          }
         }
       }
     } else {
@@ -421,7 +429,13 @@ export default function App() {
   useEffect(() => {
     if (!audioElementRef.current || !currentAudio) return;
     if (isAudioPlaying) {
-      audioElementRef.current.play().catch(e => console.warn('Audio play error:', e));
+      const promise = audioElementRef.current.play();
+      if (promise !== undefined) {
+        promise.catch(e => {
+          console.warn('Audio play error:', e);
+          setIsAudioPlaying(false);
+        });
+      }
     } else {
       audioElementRef.current.pause();
     }
@@ -449,10 +463,36 @@ export default function App() {
           currentTime: audioCurrentTime,
         },
       });
+
+      // Sync OS MediaSession API for Android Notification Shade & Lockscreen Media Controls
+      if (typeof window !== 'undefined' && 'mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: currentAudio.name,
+            artist: 'Files by Akash Kumar',
+            album: currentAudio.folder || 'Music',
+            artwork: currentAudio.thumbnail 
+              ? [{ src: currentAudio.thumbnail, sizes: '512x512', type: 'image/jpeg' }]
+              : []
+          });
+
+          navigator.mediaSession.setActionHandler('play', () => setIsAudioPlaying(true));
+          navigator.mediaSession.setActionHandler('pause', () => setIsAudioPlaying(false));
+          navigator.mediaSession.setActionHandler('previoustrack', () => handlePrevTrack());
+          navigator.mediaSession.setActionHandler('nexttrack', () => handleNextTrack());
+        } catch (err) {
+          console.warn('MediaSession error:', err);
+        }
+      }
     } else {
       dismissNotification('media-audio-player');
+      if (typeof window !== 'undefined' && 'mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.metadata = null;
+        } catch (e) {}
+      }
     }
-  }, [currentAudio, isAudioPlaying, audioCurrentTime, audioDuration, language]);
+  }, [currentAudio?.id, currentAudio?.name, isAudioPlaying, language]);
 
   // Sync notifications with Video Player
   useEffect(() => {

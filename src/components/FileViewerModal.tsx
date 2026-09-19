@@ -28,6 +28,7 @@ import { formatBytes, formatDate } from '../utils/storage';
 import { translations } from '../utils/translations';
 import { openRealFile, shareNativeFile, triggerHapticFeedback } from '../utils/nativeStorage';
 import { isArchiveFile, getArchiveBadge } from '../utils/archiveUtils';
+import { resolveMediaSrc } from '../utils/mediaUtils';
 
 interface FileViewerModalProps {
   file: FileItem | null;
@@ -265,7 +266,7 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
         {file.type === 'video' && (
           <div className="w-full h-full flex flex-col items-center justify-center gap-3">
             <video
-              src={file.url && file.url.startsWith('/') ? Capacitor.convertFileSrc(file.url) : file.url}
+              src={resolveMediaSrc(file.url)}
               controls
               autoPlay
               onError={(e) => {
@@ -288,7 +289,7 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
               <p className="text-xs text-neutral-400 mt-1">{formatBytes(file.size)} • {file.folder}</p>
             </div>
             <audio 
-              src={file.url && file.url.startsWith('/') ? Capacitor.convertFileSrc(file.url) : file.url} 
+              src={resolveMediaSrc(file.url)} 
               controls 
               autoPlay 
               onError={(e) => {

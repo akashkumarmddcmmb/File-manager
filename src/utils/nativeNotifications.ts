@@ -92,16 +92,31 @@ export async function checkNativeNotificationPermission(): Promise<boolean> {
 }
 
 /**
+ * Convert string ID to deterministic numeric ID for Android LocalNotifications
+ */
+export function getNumericNotificationId(idStr: string | number): number {
+  if (typeof idStr === 'number') return idStr;
+  if (idStr === 'media-audio-player') return 8881;
+  if (idStr === 'media-video-player') return 8882;
+  let hash = 0;
+  for (let i = 0; i < idStr.length; i++) {
+    hash = (hash << 5) - hash + idStr.charCodeAt(i);
+    hash |= 0;
+  }
+  return (Math.abs(hash) % 2000000) + 1000;
+}
+
+/**
  * Post a Real Android Status Bar / Notification Shade notification
  */
 export async function postNativeSystemNotification(options: {
-  id?: number;
+  id?: number | string;
   title: string;
   body: string;
   channelId?: 'files_transfers' | 'files_media' | 'files_general';
   extra?: Record<string, any>;
 }): Promise<void> {
-  const notifId = options.id || Math.floor(Math.random() * 1000000) + 1;
+  const notifId = options.id !== undefined ? getNumericNotificationId(options.id) : 8888;
   const channel = options.channelId || 'files_transfers';
 
   try {
@@ -139,11 +154,12 @@ export async function postNativeSystemNotification(options: {
 /**
  * Clear a specific system notification
  */
-export async function cancelNativeNotification(id: number): Promise<void> {
+export async function cancelNativeNotification(id: number | string): Promise<void> {
+  const numericId = getNumericNotificationId(id);
   try {
     if (Capacitor.isNativePlatform()) {
       await LocalNotifications.cancel({
-        notifications: [{ id }],
+        notifications: [{ id: numericId }],
       });
     }
   } catch (err) {

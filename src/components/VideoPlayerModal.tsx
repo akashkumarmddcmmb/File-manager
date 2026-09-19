@@ -21,6 +21,7 @@ import {
 import { FileItem, Language } from '../types';
 import { formatBytes } from '../utils/storage';
 import { openRealFile, shareNativeFile, triggerHapticFeedback } from '../utils/nativeStorage';
+import { resolveMediaSrc } from '../utils/mediaUtils';
 
 interface VideoPlayerModalProps {
   isOpen: boolean;
@@ -77,9 +78,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
   if (!isOpen || !file) return null;
 
-  const resolvedSrc = file.url && file.url.startsWith('/') 
-    ? Capacitor.convertFileSrc(file.url) 
-    : file.url;
+  const resolvedSrc = resolveMediaSrc(file.url);
 
   const handlePlayPause = () => {
     triggerHapticFeedback();

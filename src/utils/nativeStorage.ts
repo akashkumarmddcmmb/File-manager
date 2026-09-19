@@ -5,6 +5,7 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Share } from '@capacitor/share';
 import { FileItem, FolderItem } from '../types';
 import { classifyFile } from './fileClassifier';
+import { resolveMediaSrc } from './mediaUtils';
 
 export interface StorageVolumeInfo {
   name: string;
@@ -343,9 +344,7 @@ export async function scanNativeStorage(): Promise<{
 
     if (rootDirResult && rootDirResult.files) {
       for (const f of rootDirResult.files) {
-        const webUrl = f.path.startsWith('http') || f.path.startsWith('data:') || f.path.startsWith('blob:')
-          ? f.path
-          : (typeof Capacitor !== 'undefined' && Capacitor.convertFileSrc ? Capacitor.convertFileSrc(f.path) : f.path);
+        const webUrl = resolveMediaSrc(f.path) || f.path;
         
         const classification = classifyFile(f.name, f.mimeType);
         const resolvedType = f.type && f.type !== 'other' ? f.type : classification.type;
@@ -372,9 +371,7 @@ export async function scanNativeStorage(): Promise<{
         const catRes = await RealDeviceStorage.scanMediaCategory({ category: cat });
         if (catRes && catRes.files) {
           for (const f of catRes.files) {
-            const webUrl = f.path.startsWith('http') || f.path.startsWith('data:') || f.path.startsWith('blob:')
-              ? f.path
-              : (typeof Capacitor !== 'undefined' && Capacitor.convertFileSrc ? Capacitor.convertFileSrc(f.path) : f.path);
+            const webUrl = resolveMediaSrc(f.path) || f.path;
 
             const classification = classifyFile(f.name, f.mimeType);
             const resolvedType = f.type && f.type !== 'other' ? f.type : classification.type;
@@ -501,9 +498,7 @@ export async function scanCategoryFilesFromDevice(category: string): Promise<Fil
     if (!res || !res.files) return null;
 
     return res.files.map(f => {
-      const webUrl = f.path.startsWith('http') || f.path.startsWith('data:') || f.path.startsWith('blob:')
-        ? f.path
-        : (typeof Capacitor !== 'undefined' && Capacitor.convertFileSrc ? Capacitor.convertFileSrc(f.path) : f.path);
+      const webUrl = resolveMediaSrc(f.path) || f.path;
       
       const classification = classifyFile(f.name, f.mimeType);
       const resolvedType = f.type && f.type !== 'other' ? f.type : classification.type;

@@ -23,6 +23,7 @@ import {
 import { FileItem, Language } from '../types';
 import { formatBytes } from '../utils/storage';
 import { openRealFile, shareNativeFile, triggerHapticFeedback } from '../utils/nativeStorage';
+import { resolveMediaSrc } from '../utils/mediaUtils';
 
 interface PdfDocumentViewerModalProps {
   isOpen: boolean;
@@ -49,9 +50,7 @@ export const PdfDocumentViewerModal: React.FC<PdfDocumentViewerModalProps> = ({
   if (!isOpen || !file) return null;
 
   const isPdf = file.mimeType === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-  const resolvedUrl = file.url && file.url.startsWith('/') 
-    ? Capacitor.convertFileSrc(file.url) 
-    : file.url;
+  const resolvedUrl = resolveMediaSrc(file.url);
 
   const handleCopyText = () => {
     if (file.content) {

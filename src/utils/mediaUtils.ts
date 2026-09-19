@@ -22,13 +22,16 @@ export function resolveMediaSrc(urlOrPath?: string): string | undefined {
   // Native filesystem path (/storage/emulated/0/... or file://...)
   try {
     if (typeof Capacitor !== 'undefined' && Capacitor.convertFileSrc) {
-      return Capacitor.convertFileSrc(urlOrPath);
+      const converted = Capacitor.convertFileSrc(urlOrPath);
+      // Properly encode URI characters (spaces, brackets, special symbols)
+      // to avoid Java IllegalArgumentException in Android WebView
+      return encodeURI(converted);
     }
   } catch (err) {
     console.warn('Capacitor convertFileSrc error:', err);
   }
 
-  return urlOrPath;
+  return encodeURI(urlOrPath);
 }
 
 /**
