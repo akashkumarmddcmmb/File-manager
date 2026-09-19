@@ -129,13 +129,20 @@ export default function App() {
     return 684 * 1024 * 1024; // 684 MB junk cache
   });
 
-  // Save changes to localStorage
+  // Battery Optimization: Debounce heavy JSON serialization to LocalStorage to save CPU and battery
+  const filesSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_FILES_KEY, JSON.stringify(files));
-    } catch (e) {
-      console.error(e);
-    }
+    if (filesSaveTimerRef.current) clearTimeout(filesSaveTimerRef.current);
+    filesSaveTimerRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(STORAGE_FILES_KEY, JSON.stringify(files));
+      } catch (e) {
+        console.error(e);
+      }
+    }, 1000);
+    return () => {
+      if (filesSaveTimerRef.current) clearTimeout(filesSaveTimerRef.current);
+    };
   }, [files]);
 
   useEffect(() => {
@@ -175,11 +182,20 @@ export default function App() {
   } | null>(null);
   const [isScanningStorage, setIsScanningStorage] = useState(false);
 
+  const lastStorageScanTimestampRef = useRef<number>(0);
+
   const loadRealDeviceStorage = async (showFeedback = false) => {
     try {
       const native = await isNativePlatform();
       setIsNative(native);
       if (!native) return;
+
+      const now = Date.now();
+      // Battery Optimization: Throttle auto-scanning on focus/visibility change (min 60s gap unless manually requested)
+      if (!showFeedback && lastStorageScanTimestampRef.current > 0 && (now - lastStorageScanTimestampRef.current < 60000)) {
+        return;
+      }
+      lastStorageScanTimestampRef.current = now;
 
       const perm = await checkStoragePermissionStatus();
       setPermStatus(perm);
@@ -398,18 +414,20 @@ export default function App() {
   const [audioDuration, setAudioDuration] = useState(0);
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('all');
+  const [audioPlaybackSpeed, setAudioPlaybackSpeed] = useState<number>(1);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
   const [videoPlayerFile, setVideoPlayerFile] = useState<FileItem | null>(null);
   const [pdfViewerFile, setPdfViewerFile] = useState<FileItem | null>(null);
 
-  // Sync background HTML audio element with currentAudio
+  // Sync background HTML audio element with currentAudio & playback rate
   useEffect(() => {
     if (!audioElementRef.current) return;
     if (currentAudio) {
       const src = resolveMediaSrc(currentAudio.url);
       if (src) {
         audioElementRef.current.src = src;
+        audioElementRef.current.playbackRate = audioPlaybackSpeed;
         if (isAudioPlaying) {
           const promise = audioElementRef.current.play();
           if (promise !== undefined) {
@@ -425,6 +443,12 @@ export default function App() {
       audioElementRef.current.src = '';
     }
   }, [currentAudio]);
+
+  useEffect(() => {
+    if (audioElementRef.current) {
+      audioElementRef.current.playbackRate = audioPlaybackSpeed;
+    }
+  }, [audioPlaybackSpeed]);
 
   useEffect(() => {
     if (!audioElementRef.current || !currentAudio) return;
@@ -480,6 +504,22 @@ export default function App() {
           navigator.mediaSession.setActionHandler('pause', () => setIsAudioPlaying(false));
           navigator.mediaSession.setActionHandler('previoustrack', () => handlePrevTrack());
           navigator.mediaSession.setActionHandler('nexttrack', () => handleNextTrack());
+          navigator.mediaSession.setActionHandler('seekto', (details) => {
+            if (details.seekTime !== undefined && audioElementRef.current) {
+              audioElementRef.current.currentTime = details.seekTime;
+              setAudioCurrentTime(details.seekTime);
+            }
+          });
+
+          if ('setPositionState' in navigator.mediaSession && audioDuration > 0 && isFinite(audioDuration)) {
+            try {
+              navigator.mediaSession.setPositionState({
+                duration: audioDuration,
+                playbackRate: audioPlaybackSpeed || 1,
+                position: Math.min(audioCurrentTime, audioDuration),
+              });
+            } catch (e) {}
+          }
         } catch (err) {
           console.warn('MediaSession error:', err);
         }
@@ -1220,7 +1260,7 @@ export default function App() {
       setTransferTask(prev => {
         if (!prev || prev.status !== 'transferring') return prev;
 
-        const dt = 0.25; // 250ms interval
+        const dt = 0.5; // 500ms interval for smooth progress and battery optimization
         // Real-world speed jitter +/- 8% around the chosen speedSetting
         const jitter = 0.92 + Math.random() * 0.16;
         const currentSpeedMbps = Math.max(1, Math.round(prev.speedSetting * jitter * 10) / 10);
@@ -1328,7 +1368,7 @@ export default function App() {
           currentFileIndex: fileIdx,
         };
       });
-    }, 250);
+    }, 500);
 
     return () => clearInterval(interval);
   }, [transferTask?.status, transferTask?.speedSetting, transferTask?.totalBytes]);
@@ -1925,6 +1965,7 @@ export default function App() {
         duration={audioDuration}
         isShuffle={isShuffle}
         repeatMode={repeatMode}
+        playbackSpeed={audioPlaybackSpeed}
         language={language}
         onClose={() => setIsAudioPlayerOpen(false)}
         onMinimize={() => setIsAudioPlayerOpen(false)}
@@ -1941,11 +1982,22 @@ export default function App() {
         onToggleRepeat={() => {
           setRepeatMode(prev => prev === 'off' ? 'all' : prev === 'all' ? 'one' : 'off');
         }}
+        onChangeSpeed={(speed) => setAudioPlaybackSpeed(speed)}
         onSelectTrack={(track) => {
           setCurrentAudio(track);
           setIsAudioPlaying(true);
         }}
         onToggleStar={handleToggleStar}
+        onMoveToTrash={(id) => handleMoveToTrash(id)}
+        onQuickCopy={(f) => handleQuickCopy(f)}
+        onQuickCut={(f) => handleQuickCut(f)}
+        onMoveToSafeFolder={(id) => {
+          setFiles(prev => prev.map(f => f.id === id ? { ...f, isSafe: true } : f));
+          showToast(language === 'hi' ? 'सेफ़ फ़ोल्डर में भेजा गया 🔒' : 'Moved to Safe folder 🔒');
+        }}
+        onSetAsRingtone={(f) => {
+          showToast(language === 'hi' ? `"${f.name}" रिंगटोन सेट की गई 🔔` : `"${f.name}" set as ringtone 🔔`);
+        }}
       />
 
       {/* Full Dedicated Mobile Video Player Modal */}

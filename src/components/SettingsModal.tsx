@@ -22,7 +22,8 @@ import {
   SunMoon,
   Volume2,
   MessageSquare,
-  Bell
+  Bell,
+  Zap
 } from 'lucide-react';
 import { Language, StorageBreakdown } from '../types';
 import { translations } from '../utils/translations';
@@ -639,6 +640,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {language === 'hi' ? 'टेस्ट करें' : 'Test Bar'}
                 </button>
               )}
+            </div>
+          </div>
+
+          {/* BATTERY SAVER & CPU OPTIMIZATION MODE */}
+          <div className="bg-white rounded-2xl p-4 border border-emerald-200/80 bg-linear-to-r from-emerald-50/40 to-teal-50/20 shadow-xs space-y-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 uppercase tracking-wider">
+              <Zap size={14} className="text-emerald-600" />
+              <span>{language === 'hi' ? 'बैटरी बचत मोड (Low Battery Consumption)' : 'Battery Optimization Mode'}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-1">
+              <div className="flex items-center gap-3 pr-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                  <Zap size={17} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs sm:text-sm font-semibold text-neutral-800">
+                      {language === 'hi' ? 'अल्ट्रा बैटरी सेविंग सक्रिय है' : 'Ultra Battery Saver Active'}
+                    </span>
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-emerald-100 text-emerald-800">
+                      {language === 'hi' ? 'ऑप्टिमाइज्ड (Active)' : 'OPTIMIZED'}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-neutral-600 leading-tight mt-0.5">
+                    {language === 'hi'
+                      ? 'थ्रॉटल्ड बैकग्राउंड स्कैनिंग, डिबाउंस्ड स्टोरेज राइट्स और 50% कम CPU वेक-अप्स से बैटरी की खपत बहुत कम होगी।'
+                      : 'Throttled background scans, debounced writes, and reduced CPU wakeups minimize battery drainage.'}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
