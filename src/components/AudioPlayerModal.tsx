@@ -33,6 +33,7 @@ import { FileItem, Language } from '../types';
 import { formatBytes } from '../utils/storage';
 import { openRealFile, shareNativeFile, triggerHapticFeedback } from '../utils/nativeStorage';
 import { AndroidMediaCard } from './AndroidMediaCard';
+import { RingtoneSetModal } from './RingtoneSetModal';
 
 interface AudioPlayerModalProps {
   isOpen: boolean;
@@ -61,7 +62,7 @@ interface AudioPlayerModalProps {
   onQuickCopy?: (file: FileItem) => void;
   onQuickCut?: (file: FileItem) => void;
   onMoveToSafeFolder?: (id: string) => void;
-  onSetAsRingtone?: (file: FileItem) => void;
+  onSetAsRingtone?: (file: FileItem, message?: string) => void;
   onOpenLockScreen?: () => void;
 }
 
@@ -97,6 +98,7 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'player' | 'lockcard' | 'playlist' | 'details'>('player');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isRingtoneModalOpen, setIsRingtoneModalOpen] = useState(false);
   const [isSpeedModalOpen, setIsSpeedModalOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -171,6 +173,21 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
               title={language === 'hi' ? 'स्क्रीन लॉक प्लेयर' : 'Lock Screen Player'}
             >
               <Lock size={20} />
+            </button>
+          )}
+
+          {/* Direct Lock Screen Player Quick Button matching screenshot request */}
+          {onOpenLockScreen && (
+            <button
+              onClick={() => {
+                triggerHapticFeedback();
+                onOpenLockScreen();
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-medium border border-white/15 cursor-pointer transition-all shadow-xs"
+              title={language === 'hi' ? 'लॉकस्क्रीन प्लेयर देखें' : 'View Lock Screen Player'}
+            >
+              <Lock size={14} className="text-emerald-400" />
+              <span className="hidden sm:inline">{language === 'hi' ? 'लॉकस्क्रीन' : 'Lock Screen'}</span>
             </button>
           )}
 
@@ -319,7 +336,7 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
                 onClick={() => {
                   setIsMenuOpen(false);
                   triggerHapticFeedback();
-                  if (onSetAsRingtone) onSetAsRingtone(file);
+                  setIsRingtoneModalOpen(true);
                 }}
                 className="w-full px-4 py-2.5 text-left text-sm hover:bg-white/10 flex items-center gap-3 transition-colors cursor-pointer"
               >
@@ -783,6 +800,17 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* RINGTONE SETTINGS MODAL */}
+      <RingtoneSetModal
+        isOpen={isRingtoneModalOpen}
+        file={file}
+        language={language}
+        onClose={() => setIsRingtoneModalOpen(false)}
+        onSuccess={(msg) => {
+          if (onSetAsRingtone) onSetAsRingtone(file, msg);
+        }}
+      />
     </div>
   );
 };

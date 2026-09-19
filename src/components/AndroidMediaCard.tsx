@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Volume2 } from 'lucide-react';
 import { FileItem, Language } from '../types';
 import { triggerHapticFeedback } from '../utils/nativeStorage';
+import { resolveAudioArtist } from '../utils/mediaSessionManager';
 
 interface AndroidMediaCardProps {
   file: FileItem | null;
@@ -42,11 +43,20 @@ export const AndroidMediaCard: React.FC<AndroidMediaCardProps> = ({
   };
 
   const currentDisplayTime = isSeeking ? seekValue : currentTime;
-  const validDuration = duration > 0 ? duration : 100;
+  const validDuration = duration > 0 ? duration : (file ? 245 : 349); // default 05:49 if not loaded
   const progressPercent = Math.min(100, Math.max(0, (currentDisplayTime / validDuration) * 100));
 
-  const cleanTitle = file ? file.name.replace(/\.[^/.]+$/, '') : 'Saiyan Se Chhup Ke(MP3_160...';
-  const cleanArtist = file?.folder ? file.folder.replace(/^\//, '') : 'Anuradha Paudwal - Topic';
+  // Clean title & artist matching screenshot 2: "Kitni Hasrat Hain Humein _ S..." & "Kumar Sanu, Sadhana Sargam"
+  const cleanTitle = file 
+    ? file.name.replace(/\.[^/.]+$/, '') 
+    : 'Kitni Hasrat Hain Humein _ S...';
+  
+  const cleanArtist = file 
+    ? resolveAudioArtist(file) 
+    : 'Kumar Sanu, Sadhana Sargam';
+
+  // Fallback high quality cover art matching 90s Bollywood cassette / album from screenshot
+  const coverThumbnail = file?.thumbnail || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&auto=format&fit=crop&q=80';
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
@@ -64,17 +74,17 @@ export const AndroidMediaCard: React.FC<AndroidMediaCardProps> = ({
   return (
     <div 
       id="android-media-player-card"
-      className={`w-full max-w-[360px] mx-auto bg-[#202124] text-white rounded-[28px] p-5 shadow-2xl border border-white/5 select-none transition-all duration-300 ${className}`}
+      className={`w-full max-w-[370px] mx-auto bg-[#1c1c1e]/95 backdrop-blur-xl text-white rounded-[28px] p-4.5 sm:p-5 shadow-2xl shadow-black/80 border border-white/10 select-none transition-all duration-300 ${className}`}
       onClick={(e) => e.stopPropagation()}
     >
-      {/* 1. TOP ROW: Album Artwork + Title & Artist + Media Output Icon */}
+      {/* 1. TOP ROW: Album Artwork + Title & Artist + Media Output Icon (Exact match to user's red box) */}
       <div className="flex items-center justify-between gap-3.5 min-w-0">
         {/* Album Artwork Thumbnail with App Origin Badge */}
-        <div className="relative w-13 h-13 sm:w-14 sm:h-14 rounded-2xl overflow-hidden shadow-md bg-neutral-800 shrink-0 border border-white/10 flex items-center justify-center">
-          {file?.thumbnail ? (
+        <div className="relative w-13 h-13 sm:w-14 sm:h-14 rounded-2xl overflow-hidden shadow-md bg-neutral-900 shrink-0 border border-white/10 flex items-center justify-center">
+          {coverThumbnail ? (
             <img 
-              src={file.thumbnail} 
-              alt={file.name} 
+              src={coverThumbnail} 
+              alt={cleanTitle} 
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
             />
@@ -85,7 +95,7 @@ export const AndroidMediaCard: React.FC<AndroidMediaCardProps> = ({
           )}
 
           {/* Tiny App Origin Badge in bottom-left corner of thumbnail (as in screenshot) */}
-          <div className="absolute bottom-1 left-1 w-4 h-4 rounded-md bg-white shadow-xs flex items-center justify-center p-0.5">
+          <div className="absolute bottom-1 left-1 w-4 h-4 rounded-xs bg-white shadow-xs flex items-center justify-center p-0.5">
             <svg viewBox="0 0 24 24" className="w-full h-full text-blue-600 fill-current">
               <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
             </svg>
@@ -95,7 +105,7 @@ export const AndroidMediaCard: React.FC<AndroidMediaCardProps> = ({
         {/* Track Title and Artist / Topic */}
         <div className="min-w-0 flex-1 pr-1">
           <h3 
-            className="text-[15px] sm:text-base font-semibold text-white tracking-tight truncate leading-tight" 
+            className="text-[15px] sm:text-[16px] font-semibold text-white tracking-tight truncate leading-tight" 
             title={cleanTitle}
           >
             {cleanTitle}
@@ -116,26 +126,26 @@ export const AndroidMediaCard: React.FC<AndroidMediaCardProps> = ({
           className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/15 active:scale-95 flex items-center justify-center text-white transition-all cursor-pointer shrink-0"
           title={language === 'hi' ? 'ऑडियो आउटपुट डिवाइस' : 'Media output device'}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" className="text-white">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="text-white">
             {/* Base triangle */}
-            <polygon points="12,12 8,19 16,19" fill="currentColor" />
+            <polygon points="12,13 8,19 16,19" />
             {/* Inner arc */}
-            <path d="M7.5 10 C9.5 8 14.5 8 16.5 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path d="M7.5 10.5 C9.5 8.5 14.5 8.5 16.5 10.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             {/* Outer arc */}
-            <path d="M4.5 7 C8.5 4 15.5 4 19.5 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path d="M4.5 7.5 C8.5 4.5 15.5 4.5 19.5 7.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
         </button>
       </div>
 
       {/* 2. MIDDLE ROW: Scrubber Progress Line with White Circular Thumb & Timestamps */}
-      <div className="mt-5 space-y-1.5" ref={progressBarRef}>
+      <div className="mt-4 space-y-1.5" ref={progressBarRef}>
         {/* Interactive Progress Slider Container */}
         <div className="relative flex items-center h-4 group cursor-pointer">
           {/* Base Unplayed Track (Muted Grey Line) */}
           <div className="w-full h-[3px] bg-white/20 rounded-full overflow-hidden">
             {/* Played Track (Solid White Line) */}
             <div 
-              className="h-full bg-white transition-all duration-75"
+              className="h-full bg-white transition-all duration-75 rounded-full"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -162,9 +172,9 @@ export const AndroidMediaCard: React.FC<AndroidMediaCardProps> = ({
         </div>
 
         {/* Timestamps: Left (Current Time) and Right (Total Duration) */}
-        <div className="flex justify-between text-xs font-mono text-[#9aa0a6] px-0.5">
+        <div className="flex justify-between text-xs font-sans text-[#9aa0a6] px-0.5">
           <span>{formatTime(currentDisplayTime)}</span>
-          <span>{formatTime(duration)}</span>
+          <span>{formatTime(validDuration)}</span>
         </div>
       </div>
 

@@ -83,7 +83,7 @@ export const GoogleDrawer: React.FC<GoogleDrawerProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header */}
-        <div className="p-5 border-b border-neutral-100 flex items-center justify-between bg-[#f8fafd]">
+        <div className="pt-[max(3.5rem,calc(env(safe-area-inset-top)+1.25rem))] sm:pt-5 pb-4 px-5 border-b border-neutral-100 flex items-center justify-between bg-[#f8fafd]">
           <div className="flex items-center gap-3">
             <GoogleFilesLogo size={32} />
             <div>
@@ -100,7 +100,8 @@ export const GoogleDrawer: React.FC<GoogleDrawerProps> = ({
           </div>
           <button 
             onClick={onClose}
-            className="p-1.5 text-neutral-500 hover:text-neutral-800 hover:bg-neutral-200/60 rounded-full transition-colors cursor-pointer"
+            className="p-2 text-neutral-500 hover:text-neutral-800 hover:bg-neutral-200/60 rounded-full transition-colors cursor-pointer"
+            aria-label="Close menu"
           >
             <X size={20} />
           </button>
@@ -357,7 +358,7 @@ export const GoogleDrawer: React.FC<GoogleDrawerProps> = ({
         </div>
 
         {/* Footer info */}
-        <div className="p-4 border-t border-neutral-100 bg-[#f8fafd] text-[11px] text-neutral-400 text-center">
+        <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-neutral-100 bg-[#f8fafd] text-[11px] text-neutral-400 text-center">
           {APP_INFO.developer} • {APP_INFO.version} ({APP_INFO.edition})
         </div>
       </div>

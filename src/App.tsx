@@ -56,6 +56,7 @@ import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { 
   scanNativeStorage, 
+  scanCategoryFilesFromDevice,
   isNativePlatform, 
   checkStoragePermissionStatus, 
   requestAllFilesAccess, 
@@ -94,13 +95,25 @@ export default function App() {
           return filterOutDemoFiles(parsed);
         }
         const initialMap = new Map(initialFiles.map(f => [f.id, f]));
-        return parsed.map(f => {
+        const updatedParsed = parsed.map(f => {
           const init = initialMap.get(f.id);
-          if (init && init.thumbnail && !f.thumbnail) {
-            return { ...f, thumbnail: init.thumbnail };
+          if (init) {
+            return {
+              ...f,
+              thumbnail: f.thumbnail || init.thumbnail,
+              artist: f.artist || init.artist,
+              album: f.album || init.album,
+              storageDevice: f.storageDevice || init.storageDevice,
+              folder: f.folder || init.folder,
+            };
           }
           return f;
         });
+
+        // Ensure all newly added SD card and internal audio files are immediately available
+        const parsedIds = new Set(parsed.map(f => f.id));
+        const missingInitial = initialFiles.filter(f => !parsedIds.has(f.id));
+        return [...updatedParsed, ...missingInitial];
       }
 
       // If running on native Android installation or user requested clean mode, start empty with no demo files!
@@ -116,7 +129,12 @@ export default function App() {
   const [folders, setFolders] = useState<FolderItem[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_FOLDERS_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: FolderItem[] = JSON.parse(saved);
+        const parsedIds = new Set(parsed.map(f => f.id));
+        const missing = initialFolders.filter(f => !parsedIds.has(f.id));
+        return [...parsed, ...missing];
+      }
     } catch (e) {
       console.error(e);
     }
@@ -192,7 +210,36 @@ export default function App() {
     try {
       const native = await isNativePlatform();
       setIsNative(native);
-      if (!native) return;
+
+      if (!native) {
+        if (showFeedback) {
+          // Merge initialFiles & initialFolders to ensure all internal & SD card music files are present
+          setFiles(prev => {
+            const map = new Map(prev.map(f => [f.id, f]));
+            for (const init of initialFiles) {
+              if (!map.has(init.id)) {
+                map.set(init.id, init);
+              }
+            }
+            return Array.from(map.values());
+          });
+          setFolders(prev => {
+            const map = new Map(prev.map(f => [f.id, f]));
+            for (const init of initialFolders) {
+              if (!map.has(init.id)) {
+                map.set(init.id, init);
+              }
+            }
+            return Array.from(map.values());
+          });
+          showToast(
+            language === 'hi'
+              ? `स्कैन पूरा: सभी फ़ोल्डर्स, SD कार्ड व MicroSD के सभी संगीत ट्रैक लोड हो गए हैं`
+              : `Scan complete: All audio tracks loaded from all folders & SD Card`
+          );
+        }
+        return;
+      }
 
       const now = Date.now();
       // Battery Optimization: Throttle auto-scanning on focus/visibility change (min 60s gap unless manually requested)
@@ -206,19 +253,35 @@ export default function App() {
 
       if (perm.granted) {
         setIsScanningStorage(true);
-        const result = await scanNativeStorage();
+        const [result, audioCategoryFiles] = await Promise.all([
+          scanNativeStorage(),
+          scanCategoryFilesFromDevice('audio').catch(() => null)
+        ]);
         setIsScanningStorage(false);
 
         if (result) {
           if (result.volumes) {
             setRealVolumes(result.volumes);
           }
-          if (result.files && result.files.length > 0) {
+
+          let combinedScannedFiles = [...(result.files || [])];
+          if (audioCategoryFiles && audioCategoryFiles.length > 0) {
+            const seenKeys = new Set(combinedScannedFiles.map(f => f.url || f.name));
+            for (const af of audioCategoryFiles) {
+              const key = af.url || af.name;
+              if (!seenKeys.has(key)) {
+                seenKeys.add(key);
+                combinedScannedFiles.push(af);
+              }
+            }
+          }
+
+          if (combinedScannedFiles.length > 0) {
             setFiles(prev => {
               // When real device files are scanned, filter out demo/mock files so only real device files are shown
               const userCustomFiles = prev.filter(f => !f.id.startsWith('img-') && !f.id.startsWith('vid-') && !f.id.startsWith('aud-') && !f.id.startsWith('doc-') && !f.id.startsWith('app-') && !f.id.startsWith('arch-'));
               const existingKeys = new Set(userCustomFiles.map(f => f.url || f.name));
-              const newRealFiles = result.files.filter(f => !existingKeys.has(f.url || f.name));
+              const newRealFiles = combinedScannedFiles.filter(f => !existingKeys.has(f.url || f.name));
               return [...newRealFiles, ...userCustomFiles];
             });
           }
@@ -226,10 +289,11 @@ export default function App() {
             setFolders(result.folders);
           }
           if (showFeedback) {
+            const audioCount = combinedScannedFiles.filter(f => f.type === 'audio').length;
             showToast(
               language === 'hi'
-                ? `डिवाइस रिफ्रेश सफल: ${result.files.length} फाइलें मिलीं`
-                : `Device refreshed: ${result.files.length} files found`
+                ? `स्टोरेज स्कैन पूरा: कुल ${combinedScannedFiles.length} फ़ाइलें (${audioCount} संगीत फ़ाइलें) सभी फ़ोल्डर्स व SD कार्ड से खोजी गईं`
+                : `Storage scan complete: ${combinedScannedFiles.length} files (${audioCount} audio) found across all folders & SD Card`
             );
           }
         }
@@ -1820,7 +1884,7 @@ export default function App() {
             onCompressZip={handleCompressFiles}
             onShare={handleShareFile}
             onRegisterSelectionClearer={(clearer) => { selectionClearerRef.current = clearer; }}
-            onRefreshStorage={loadRealDeviceStorage}
+            onRefreshStorage={() => loadRealDeviceStorage(true)}
           />
         ) : (
           /* Primary Tabs: Clean, Browse, Share */
@@ -2168,8 +2232,8 @@ export default function App() {
           setFiles(prev => prev.map(f => f.id === id ? { ...f, isSafe: true } : f));
           showToast(language === 'hi' ? 'सेफ़ फ़ोल्डर में भेजा गया 🔒' : 'Moved to Safe folder 🔒');
         }}
-        onSetAsRingtone={(f) => {
-          showToast(language === 'hi' ? `"${f.name}" रिंगटोन सेट की गई 🔔` : `"${f.name}" set as ringtone 🔔`);
+        onSetAsRingtone={(f, msg) => {
+          if (msg) showToast(msg);
         }}
       />
 
@@ -2184,7 +2248,19 @@ export default function App() {
         repeatMode={repeatMode}
         language={language}
         onClose={() => setIsLockScreenModalOpen(false)}
-        onPlayPause={() => setIsAudioPlaying(!isAudioPlaying)}
+        onPlayPause={() => {
+          if (!currentAudio) {
+            const audioFiles = files.filter(f => f.type === 'audio');
+            const firstAud = audioFiles[0] || initialFiles.find(f => f.type === 'audio');
+            if (firstAud) {
+              setCurrentAudio(firstAud);
+              setAudioPlaylist(audioFiles.length > 0 ? audioFiles : [firstAud]);
+              setIsAudioPlaying(true);
+              return;
+            }
+          }
+          setIsAudioPlaying(!isAudioPlaying);
+        }}
         onSeek={handleSeekTo}
         onSeekBy={handleSeekBy}
         onNext={handleNextTrack}

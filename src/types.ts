@@ -21,6 +21,8 @@ export interface FileItem {
   mimeType: string;
   folder: string; // e.g. "/DCIM/Camera", "/Download", "/Documents"
   storageDevice?: StorageDevice; // 'internal' | 'sdcard'
+  artist?: string;
+  album?: string;
   createdAt: string;
   updatedAt: string;
   url?: string;

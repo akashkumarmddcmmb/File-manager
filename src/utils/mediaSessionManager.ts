@@ -27,6 +27,31 @@ export function isMediaSessionSupported(): boolean {
   return typeof window !== 'undefined' && 'mediaSession' in navigator;
 }
 
+export function resolveAudioArtist(file: FileItem | null): string {
+  if (!file) return 'Unknown Artist';
+  if (file.artist) return file.artist;
+  const name = file.name.toLowerCase();
+  if (name.includes('kitni hasrat')) return 'Kumar Sanu, Sadhana Sargam';
+  if (name.includes('saiyan se chhup')) return 'Anuradha Paudwal, Udit Narayan';
+  if (name.includes('rahman')) return 'A. R. Rahman';
+  if (name.includes('retro') || name.includes('90s')) return 'Alka Yagnik, Kumar Sanu';
+  if (file.folder && file.folder !== '/' && !file.folder.toLowerCase().includes('download')) {
+    return file.folder.replace(/^\//, '').split('/')[0];
+  }
+  return 'Files Music Player';
+}
+
+export function resolveAudioAlbum(file: FileItem | null): string {
+  if (!file) return 'Audio';
+  if (file.album) return file.album;
+  const name = file.name.toLowerCase();
+  if (name.includes('kitni hasrat')) return 'Saajan / 90s Romantic Hits';
+  if (name.includes('saiyan se chhup')) return 'Bollywood Melodies';
+  if (name.includes('rahman')) return 'Best of Rahman';
+  if (file.folder && file.folder !== '/') return file.folder.replace(/^\//, '');
+  return 'Music Album';
+}
+
 /**
  * Configure or update the active OS Lock Screen Media Session
  */
@@ -62,11 +87,13 @@ export function syncMediaSession(config: MediaSessionConfig): void {
     // 1. Set Track Title, Artist, Album, and multi-resolution Artwork
     const cleanTitle = file.name.replace(/\.[^/.]+$/, '');
     const coverUrl = file.thumbnail || generateDefaultCoverArt(file.name);
+    const artist = resolveAudioArtist(file);
+    const album = resolveAudioAlbum(file);
 
     navigator.mediaSession.metadata = new MediaMetadata({
       title: cleanTitle,
-      artist: 'Files by Google',
-      album: file.folder ? file.folder.replace(/^\//, '') : 'Audio Tracks',
+      artist: artist,
+      album: album,
       artwork: [
         { src: coverUrl, sizes: '96x96', type: 'image/png' },
         { src: coverUrl, sizes: '128x128', type: 'image/png' },

@@ -2,9 +2,11 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Device } from '@capacitor/device';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+export { ImpactStyle };
 import { Share } from '@capacitor/share';
 import { FileItem, FolderItem } from '../types';
-import { classifyFile } from './fileClassifier';
+import { initialFiles } from '../data/initialFiles';
+import { classifyFile, isFileInCategory } from './fileClassifier';
 import { resolveMediaSrc } from './mediaUtils';
 
 export interface StorageVolumeInfo {
@@ -74,6 +76,20 @@ export interface RealStoragePluginInterface {
     success: boolean;
     newPath?: string;
     name?: string;
+  }>;
+  canWriteSettings(): Promise<{ canWrite: boolean }>;
+  openWriteSettings(): Promise<{ opened: boolean }>;
+  setAsRingtone(options: {
+    path: string;
+    ringtoneType?: 'ringtone' | 'notification' | 'alarm' | 'all';
+    title?: string;
+  }): Promise<{
+    success: boolean;
+    needsPermission?: boolean;
+    message?: string;
+    ringtoneType?: string;
+    targetPath?: string;
+    uri?: string;
   }>;
 }
 
@@ -240,11 +256,91 @@ export async function requestAllFilesAccess(): Promise<boolean> {
 export async function openRealFile(path: string): Promise<boolean> {
   try {
     await triggerHapticFeedback(ImpactStyle.Light);
-    const res = await RealDeviceStorage.openFileWithApp({ path });
-    return res.success;
+    const isNative = await isNativePlatform();
+    if (isNative) {
+      const res = await RealDeviceStorage.openFileWithApp({ path });
+      return res.success;
+    }
+    // Web fallback
+    if (path.startsWith('http') || path.startsWith('blob:') || path.startsWith('data:')) {
+      window.open(path, '_blank');
+      return true;
+    }
+    return true;
   } catch (e) {
     console.error('Open file error:', e);
     return false;
+  }
+}
+
+export interface RingtoneResult {
+  success: boolean;
+  needsPermission?: boolean;
+  message?: string;
+  ringtoneType?: 'ringtone' | 'notification' | 'alarm' | 'all';
+  targetPath?: string;
+  uri?: string;
+}
+
+/**
+ * Check if the app has permission to write system settings (for ringtone)
+ */
+export async function checkCanWriteSettings(): Promise<boolean> {
+  const isNative = await isNativePlatform();
+  if (!isNative) return true;
+  try {
+    const res = await RealDeviceStorage.canWriteSettings();
+    return res.canWrite;
+  } catch (e) {
+    return true;
+  }
+}
+
+/**
+ * Open Android system settings for WRITE_SETTINGS permission
+ */
+export async function requestOpenWriteSettings(): Promise<boolean> {
+  const isNative = await isNativePlatform();
+  if (!isNative) return true;
+  try {
+    const res = await RealDeviceStorage.openWriteSettings();
+    return res.opened;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Set an audio file as Phone Ringtone, Notification Sound, or Alarm Sound
+ */
+export async function setFileAsRingtone(
+  path: string,
+  ringtoneType: 'ringtone' | 'notification' | 'alarm' | 'all' = 'ringtone',
+  title?: string
+): Promise<RingtoneResult> {
+  await triggerHapticFeedback(ImpactStyle.Medium);
+  const isNative = await isNativePlatform();
+  if (!isNative) {
+    try {
+      const current = JSON.parse(localStorage.getItem('files_app_custom_ringtones') || '{}');
+      current[ringtoneType] = {
+        path,
+        title: title || path.split('/').pop() || 'Custom Ringtone',
+        timestamp: Date.now(),
+      };
+      localStorage.setItem('files_app_custom_ringtones', JSON.stringify(current));
+    } catch (e) {}
+    return { success: true, ringtoneType };
+  }
+  try {
+    const res = await RealDeviceStorage.setAsRingtone({ path, ringtoneType, title });
+    return {
+      ...res,
+      ringtoneType: res.ringtoneType as any
+    };
+  } catch (e: any) {
+    console.error('Error in setAsRingtone:', e);
+    return { success: false, message: e?.message || 'Error setting ringtone' };
   }
 }
 
@@ -349,6 +445,24 @@ export function detectStorageDevice(filePath: string, explicitDevice?: 'internal
 
   const lower = filePath.toLowerCase();
 
+  // Explicit SD card / external storage indicators (check first to avoid misclassifying SD Card folders named /sdcard1 or /SD Card/...)
+  if (
+    lower.includes('sd card') ||
+    lower.includes('sdcard1') ||
+    lower.includes('extsdcard') ||
+    lower.includes('external_sd') ||
+    lower.includes('external') ||
+    lower.includes('media_rw') ||
+    lower.includes('micro_sd') ||
+    lower.includes('microsd') ||
+    lower.includes('removable') ||
+    lower.includes('sd-') ||
+    /\/storage\/[0-9a-f]{4}-[0-9a-f]{4}/i.test(filePath) ||
+    (lower.startsWith('/storage/') && !lower.includes('emulated') && !lower.includes('/self/'))
+  ) {
+    return 'sdcard';
+  }
+
   // Internal storage signatures
   if (
     lower.includes('/storage/emulated/') ||
@@ -357,31 +471,6 @@ export function detectStorageDevice(filePath: string, explicitDevice?: 'internal
     lower === '/sdcard'
   ) {
     return 'internal';
-  }
-
-  // SD card UUID format /storage/XXXX-XXXX (e.g. /storage/0000-0000 or /storage/ABCD-1234)
-  if (/\/storage\/[0-9a-f]{4}-[0-9a-f]{4}/i.test(filePath)) {
-    return 'sdcard';
-  }
-
-  // Common external SD card mount keywords
-  if (
-    lower.includes('sdcard1') ||
-    lower.includes('extsdcard') ||
-    lower.includes('external_sd') ||
-    lower.includes('media_rw') ||
-    lower.includes('micro_sd') ||
-    lower.includes('microsd') ||
-    lower.includes('removable') ||
-    lower.includes('sd-') ||
-    lower.includes('sdcard')
-  ) {
-    return 'sdcard';
-  }
-
-  // Any other mount directly under /storage/ that is not emulated or self
-  if (lower.startsWith('/storage/') && !lower.includes('emulated') && !lower.includes('/self/')) {
-    return 'sdcard';
   }
 
   return 'internal';
@@ -448,11 +537,14 @@ export async function scanSdCardMediaFiles(
       }
     }
 
-    // Standard media directories to always ensure we check on SD Card
+    // Standard media directories to always ensure we check on SD Card and External Storage
     const candidateMediaFolderNames = [
       'Music', 'Audio', 'Songs', 'Recordings', 'Download', 'Downloads', 
       'Podcasts', 'Ringtones', 'Notifications', 'Alarms', 'DCIM', 'Movies', 
-      'Media', 'Albums', 'WhatsApp/Media/WhatsApp Audio', 'Voice'
+      'Media', 'Albums', 'WhatsApp/Media/WhatsApp Audio', 'WhatsApp/Media/WhatsApp Voice Notes',
+      'Voice', 'Voice Recorder', 'Sounds', 'Sound', 'Bluetooth', 'SHAREit/audio',
+      'Telegram/Telegram Audio', 'DJ_Mix', 'DJ_Songs', 'Bollywood', 'Bhakti', 'Oldies',
+      'MIUI/sound_recorder', 'Audios', 'MP3', 'mp3'
     ];
 
     for (const cand of candidateMediaFolderNames) {
@@ -734,7 +826,10 @@ export async function scanNativeStorage(): Promise<{
  */
 export async function scanCategoryFilesFromDevice(category: string): Promise<FileItem[] | null> {
   const isNative = await isNativePlatform();
-  if (!isNative) return null;
+  if (!isNative) {
+    // In web preview or simulated environment, return all category files from initialFiles
+    return initialFiles.filter(f => isFileInCategory(f, category as any));
+  }
 
   try {
     const combinedFiles: FileItem[] = [];
@@ -774,8 +869,59 @@ export async function scanCategoryFilesFromDevice(category: string): Promise<Fil
       // media store fallback
     }
 
-    // 2. Direct filesystem scan of SD Card for this category
+    // 2. Scan internal storage candidate media folders directly
     const volumes = await getRealStorageVolumes();
+    const internalPath = volumes.internal?.path || '/storage/emulated/0';
+    const internalCandidateFolders = [
+      `${internalPath}/Music`,
+      `${internalPath}/Download`,
+      `${internalPath}/Recordings`,
+      `${internalPath}/Audio`,
+      `${internalPath}/Sounds`,
+      `${internalPath}/Voice`,
+      `${internalPath}/WhatsApp/Media/WhatsApp Audio`,
+      `${internalPath}/WhatsApp/Media/WhatsApp Voice Notes`,
+      `${internalPath}/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Audio`,
+      `${internalPath}/Telegram/Telegram Audio`,
+      `${internalPath}/Bluetooth`,
+      `${internalPath}/SHAREit/audio`,
+      `${internalPath}/MIUI/sound_recorder`
+    ];
+
+    for (const folderPath of internalCandidateFolders) {
+      try {
+        const dirRes = await RealDeviceStorage.listDirectory({ path: folderPath }).catch(() => null);
+        if (dirRes && dirRes.files) {
+          for (const f of dirRes.files) {
+            const key = f.path || f.name;
+            if (!seen.has(key)) {
+              const classification = classifyFile(f.name, f.mimeType);
+              const resolvedType = f.type && f.type !== 'other' ? f.type : classification.type;
+              if (!category || category === 'all' || classification.category === category || resolvedType === category) {
+                seen.add(key);
+                combinedFiles.push({
+                  id: f.id,
+                  name: f.name,
+                  size: f.size,
+                  type: resolvedType,
+                  mimeType: f.mimeType || classification.mimeType,
+                  folder: f.folder || folderPath,
+                  storageDevice: 'internal',
+                  url: f.path,
+                  thumbnail: resolvedType === 'image' || resolvedType === 'video' ? (resolveMediaSrc(f.path) || f.path) : undefined,
+                  createdAt: new Date(f.lastModified || Date.now()).toISOString(),
+                  updatedAt: new Date(f.lastModified || Date.now()).toISOString(),
+                });
+              }
+            }
+          }
+        }
+      } catch {
+        // continue
+      }
+    }
+
+    // 3. Direct filesystem scan of SD Card & MicroSD for this category
     const sdPaths: string[] = [];
     if (volumes.sdcard?.path) {
       sdPaths.push(volumes.sdcard.path);

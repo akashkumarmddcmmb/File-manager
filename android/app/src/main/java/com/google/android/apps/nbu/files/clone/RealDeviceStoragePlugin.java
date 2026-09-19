@@ -3,11 +3,13 @@ package com.google.android.apps.nbu.files.clone;
 import android.Manifest;
 import android.content.ContentResolver;
 import android.content.ContentUris;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.media.MediaScannerConnection;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -659,6 +661,172 @@ public class RealDeviceStoragePlugin extends Plugin {
             call.resolve(res);
         } catch (Exception e) {
             call.reject("Unable to open file: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void canWriteSettings(PluginCall call) {
+        boolean canWrite = true;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            canWrite = Settings.System.canWrite(getContext());
+        }
+        JSObject res = new JSObject();
+        res.put("canWrite", canWrite);
+        call.resolve(res);
+    }
+
+    @PluginMethod
+    public void openWriteSettings(PluginCall call) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS);
+                intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(intent);
+                JSObject res = new JSObject();
+                res.put("opened", true);
+                call.resolve(res);
+                return;
+            } catch (Exception e) {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(intent);
+                JSObject res = new JSObject();
+                res.put("opened", true);
+                call.resolve(res);
+                return;
+            }
+        }
+        JSObject res = new JSObject();
+        res.put("opened", false);
+        call.resolve(res);
+    }
+
+    @PluginMethod
+    public void setAsRingtone(PluginCall call) {
+        String path = call.getString("path");
+        String ringtoneType = call.getString("ringtoneType", "ringtone");
+        String title = call.getString("title");
+
+        if (path == null) {
+            call.reject("Path required");
+            return;
+        }
+        path = sanitizePath(path);
+        File srcFile = new File(path);
+        if (!srcFile.exists()) {
+            call.reject("File does not exist: " + path);
+            return;
+        }
+
+        // Check if Android requires WRITE_SETTINGS permission
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.System.canWrite(getContext())) {
+                JSObject res = new JSObject();
+                res.put("success", false);
+                res.put("needsPermission", true);
+                res.put("message", "Permission required: Settings.ACTION_MANAGE_WRITE_SETTINGS");
+                call.resolve(res);
+                return;
+            }
+        }
+
+        try {
+            String targetDirName = Environment.DIRECTORY_RINGTONES;
+            int typeFlag = RingtoneManager.TYPE_RINGTONE;
+            boolean isRingtone = true;
+            boolean isNotification = false;
+            boolean isAlarm = false;
+
+            if ("notification".equalsIgnoreCase(ringtoneType)) {
+                targetDirName = Environment.DIRECTORY_NOTIFICATIONS;
+                typeFlag = RingtoneManager.TYPE_NOTIFICATION;
+                isRingtone = false;
+                isNotification = true;
+                isAlarm = false;
+            } else if ("alarm".equalsIgnoreCase(ringtoneType)) {
+                targetDirName = Environment.DIRECTORY_ALARMS;
+                typeFlag = RingtoneManager.TYPE_ALARM;
+                isRingtone = false;
+                isNotification = false;
+                isAlarm = true;
+            } else if ("all".equalsIgnoreCase(ringtoneType)) {
+                typeFlag = RingtoneManager.TYPE_RINGTONE | RingtoneManager.TYPE_NOTIFICATION | RingtoneManager.TYPE_ALARM;
+                isRingtone = true;
+                isNotification = true;
+                isAlarm = true;
+            }
+
+            File targetDir = Environment.getExternalStoragePublicDirectory(targetDirName);
+            if (!targetDir.exists()) {
+                targetDir.mkdirs();
+            }
+
+            File destFile = new File(targetDir, srcFile.getName());
+            if (!destFile.getAbsolutePath().equals(srcFile.getAbsolutePath())) {
+                copyFileStream(srcFile, destFile);
+            }
+
+            // Trigger media scan
+            MediaScannerConnection.scanFile(getContext(), new String[]{ destFile.getAbsolutePath() }, null, null);
+
+            // Register in MediaStore
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.MediaColumns.DATA, destFile.getAbsolutePath());
+            values.put(MediaStore.MediaColumns.TITLE, (title != null && !title.isEmpty()) ? title : destFile.getName());
+            values.put(MediaStore.MediaColumns.MIME_TYPE, getMimeType(destFile.getName()));
+            values.put(MediaStore.Audio.Media.IS_RINGTONE, isRingtone);
+            values.put(MediaStore.Audio.Media.IS_NOTIFICATION, isNotification);
+            values.put(MediaStore.Audio.Media.IS_ALARM, isAlarm);
+            values.put(MediaStore.Audio.Media.IS_MUSIC, false);
+
+            Uri baseUri = MediaStore.Audio.Media.getContentUriForPath(destFile.getAbsolutePath());
+            Uri ringtoneUri = null;
+
+            if (baseUri != null) {
+                Cursor cursor = getContext().getContentResolver().query(
+                    baseUri,
+                    new String[]{ MediaStore.MediaColumns._ID },
+                    MediaStore.MediaColumns.DATA + "=?",
+                    new String[]{ destFile.getAbsolutePath() },
+                    null
+                );
+                if (cursor != null && cursor.moveToFirst()) {
+                    long id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID));
+                    ringtoneUri = ContentUris.withAppendedId(baseUri, id);
+                    getContext().getContentResolver().update(ringtoneUri, values, null, null);
+                    cursor.close();
+                } else {
+                    if (cursor != null) cursor.close();
+                    ringtoneUri = getContext().getContentResolver().insert(baseUri, values);
+                }
+            }
+
+            if (ringtoneUri == null) {
+                ringtoneUri = Uri.fromFile(destFile);
+            }
+
+            // Set system actual default ringtone
+            if ("notification".equalsIgnoreCase(ringtoneType)) {
+                RingtoneManager.setActualDefaultRingtoneUri(getContext(), RingtoneManager.TYPE_NOTIFICATION, ringtoneUri);
+            } else if ("alarm".equalsIgnoreCase(ringtoneType)) {
+                RingtoneManager.setActualDefaultRingtoneUri(getContext(), RingtoneManager.TYPE_ALARM, ringtoneUri);
+            } else if ("all".equalsIgnoreCase(ringtoneType)) {
+                RingtoneManager.setActualDefaultRingtoneUri(getContext(), RingtoneManager.TYPE_RINGTONE, ringtoneUri);
+                RingtoneManager.setActualDefaultRingtoneUri(getContext(), RingtoneManager.TYPE_NOTIFICATION, ringtoneUri);
+                RingtoneManager.setActualDefaultRingtoneUri(getContext(), RingtoneManager.TYPE_ALARM, ringtoneUri);
+            } else {
+                RingtoneManager.setActualDefaultRingtoneUri(getContext(), RingtoneManager.TYPE_RINGTONE, ringtoneUri);
+            }
+
+            JSObject res = new JSObject();
+            res.put("success", true);
+            res.put("ringtoneType", ringtoneType);
+            res.put("targetPath", destFile.getAbsolutePath());
+            res.put("uri", ringtoneUri.toString());
+            call.resolve(res);
+        } catch (Exception e) {
+            call.reject("Failed to set ringtone: " + e.getMessage());
         }
     }
 

@@ -112,8 +112,8 @@ export const MiniMusicPlayer: React.FC<MiniMusicPlayerProps> = ({
               triggerHapticFeedback();
               onOpenLockScreen();
             }}
-            className="p-1.5 text-emerald-400 hover:text-emerald-300 rounded-full hover:bg-neutral-800/80 transition-colors cursor-pointer"
-            title="Lock Screen Player"
+            className="p-1.5 bg-emerald-500/15 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/25 rounded-full transition-colors cursor-pointer border border-emerald-500/30 shadow-xs"
+            title="लॉकस्क्रीन प्लेयर (Lock Screen Player)"
           >
             <Lock size={15} />
           </button>

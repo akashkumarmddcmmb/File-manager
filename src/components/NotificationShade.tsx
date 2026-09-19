@@ -80,7 +80,7 @@ export const NotificationShade: React.FC<NotificationShadeProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 pt-[max(2.75rem,calc(env(safe-area-inset-top)+1rem))] sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
@@ -211,7 +211,14 @@ export const NotificationShade: React.FC<NotificationShadeProps> = ({
                 {/* Media Playback Card Layout */}
                 {notif.type === 'media-playback' && notif.mediaDetails && (
                   <div className="mt-3 pt-3 border-t border-neutral-100 flex items-center justify-between gap-3 bg-purple-50/50 p-2.5 rounded-xl">
-                    <div className="flex items-center gap-2.5 min-w-0">
+                    <div 
+                      className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer group"
+                      onClick={() => {
+                        onClose();
+                        if (onOpenLockScreen) onOpenLockScreen();
+                      }}
+                      title={language === 'hi' ? 'लॉकस्क्रीन प्लेयर खोलें' : 'Open Lock Screen Player'}
+                    >
                       {notif.mediaDetails.thumbnail ? (
                         <img
                           src={notif.mediaDetails.thumbnail}

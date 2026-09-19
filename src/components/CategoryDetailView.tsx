@@ -122,6 +122,18 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
     };
   }, [selectedIds, onRegisterSelectionClearer]);
 
+  // Helper to determine if a file belongs to SD card / external storage
+  const isSdCardFile = (f: FileItem): boolean => {
+    if (f.storageDevice === 'sdcard') return true;
+    const fold = (f.folder || '').toLowerCase();
+    const url = (f.url || '').toLowerCase();
+    if (fold.includes('sd card') || fold.includes('sdcard') || fold.includes('microsd') || fold.includes('external')) return true;
+    if (url.includes('/storage/') && !url.includes('emulated') && !url.includes('/self/')) return true;
+    if (/\/storage\/[0-9a-f]{4}-[0-9a-f]{4}/i.test(fold) || /\/storage\/[0-9a-f]{4}-[0-9a-f]{4}/i.test(url)) return true;
+    if (f.id.startsWith('aud-sd-') || f.id.startsWith('vid-sd-') || f.id.startsWith('doc-sd-') || f.id.startsWith('img-sd-')) return true;
+    return false;
+  };
+
   // Base list of all files in this category from both internal and SD card
   const allCategoryFiles = useMemo(() => {
     return filterFilesByCategory(files, category);
@@ -129,11 +141,11 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
 
   // Internal vs SD Card counts
   const internalFiles = useMemo(() => {
-    return allCategoryFiles.filter(f => f.storageDevice !== 'sdcard');
+    return allCategoryFiles.filter(f => !isSdCardFile(f));
   }, [allCategoryFiles]);
 
   const sdCardFiles = useMemo(() => {
-    return allCategoryFiles.filter(f => f.storageDevice === 'sdcard');
+    return allCategoryFiles.filter(f => isSdCardFile(f));
   }, [allCategoryFiles]);
 
   const hasSdCardFiles = sdCardFiles.length > 0;
@@ -144,9 +156,9 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
 
     // 1. Storage Location Filter (All vs Internal vs SD Card)
     if (storageLocationFilter === 'internal') {
-      list = list.filter(f => f.storageDevice !== 'sdcard');
+      list = list.filter(f => !isSdCardFile(f));
     } else if (storageLocationFilter === 'sdcard') {
-      list = list.filter(f => f.storageDevice === 'sdcard');
+      list = list.filter(f => isSdCardFile(f));
     }
 
     // 2. Category Sub-filter Logic
@@ -172,9 +184,9 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
       } else if (activeSubFilter === 'starred') {
         list = list.filter(f => f.isStarred);
       } else if (activeSubFilter === 'sdcard_only') {
-        list = list.filter(f => f.storageDevice === 'sdcard');
+        list = list.filter(f => isSdCardFile(f));
       } else if (activeSubFilter === 'internal_only') {
-        list = list.filter(f => f.storageDevice !== 'sdcard');
+        list = list.filter(f => !isSdCardFile(f));
       }
     }
 
@@ -212,31 +224,35 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
     }
   };
 
-  const handleDeepScanCategory = () => {
+  const handleDeepScanCategory = async () => {
     triggerHapticFeedback();
     setIsScanning(true);
     setScanMessage(
       language === 'hi' 
-        ? `पूरा फ़ोन (इंटरनल व SD कार्ड) स्कैन किया जा रहा है...` 
-        : `Scanning all phone storage (Internal & SD Card)...`
+        ? `पूरे फ़ोन के सभी फ़ोल्डर्स, SD कार्ड और MicroSD स्कैन किए जा रहे हैं...` 
+        : `Scanning all folders, SD card, MicroSD & external storage...`
     );
 
-    if (onRefreshStorage) {
-      onRefreshStorage();
+    try {
+      if (onRefreshStorage) {
+        await onRefreshStorage();
+      }
+    } catch (e) {
+      console.warn(e);
     }
 
     setTimeout(() => {
       setIsScanning(false);
       setScanMessage(
         language === 'hi'
-          ? `स्कैन पूरा हुआ: कुल ${allCategoryFiles.length} फ़ाइलें मिलीं (${internalFiles.length} इंटरनल, ${sdCardFiles.length} SD कार्ड)`
-          : `Scan complete: ${allCategoryFiles.length} files found (${internalFiles.length} Internal, ${sdCardFiles.length} SD Card)`
+          ? `स्कैन पूरा हुआ! सभी फ़ोल्डर्स से कुल ${allCategoryFiles.length} फ़ाइलें मिलीं (${internalFiles.length} इंटरनल, ${sdCardFiles.length} SD कार्ड)`
+          : `Scan complete! Found ${allCategoryFiles.length} files across all folders (${internalFiles.length} Internal, ${sdCardFiles.length} SD Card)`
       );
 
       setTimeout(() => {
         setScanMessage(null);
       }, 4000);
-    }, 1000);
+    }, 800);
   };
 
   const toggleSelect = (id: string) => {
@@ -502,8 +518,18 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
               </div>
             </div>
 
-            {/* Action icons / Search / Select All */}
+            {/* Action icons / Scan / Search / Select All */}
             <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleDeepScanCategory}
+                disabled={isScanning}
+                title={language === 'hi' ? 'सभी फ़ोल्डर व SD कार्ड स्कैन करें' : 'Scan all folders & SD Card'}
+                className="p-2 text-neutral-600 hover:text-blue-600 hover:bg-neutral-100 rounded-xl border border-neutral-200 transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
+              >
+                <RefreshCw size={15} className={isScanning ? 'animate-spin text-blue-600' : ''} />
+                <span className="hidden sm:inline">{language === 'hi' ? 'स्कैन' : 'Scan'}</span>
+              </button>
+
               <button
                 onClick={() => setShowSearch(!showSearch)}
                 title={language === 'hi' ? 'खोजें' : 'Search files'}
@@ -525,6 +551,43 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
           </>
         )}
       </div>
+
+      {/* Music Category Full Storage Deep Scan Banner */}
+      {category === 'audio' && (
+        <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-purple-50/90 dark:from-neutral-800 dark:via-neutral-800/80 dark:to-neutral-800 border border-blue-200/80 dark:border-neutral-700 rounded-2xl text-xs shadow-2xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <Music size={14} />
+            </div>
+            <div className="min-w-0">
+              <span className="font-bold text-neutral-900 dark:text-neutral-100 block truncate">
+                {language === 'hi' ? 'सभी स्टोरेज से संगीत फाइलें' : 'All Storage Music Files'}
+              </span>
+              <span className="text-[11px] text-neutral-500 dark:text-neutral-400 block truncate">
+                {language === 'hi' 
+                  ? `फ़ोन मेमोरी (${internalFiles.length}) + SD कार्ड/MicroSD (${sdCardFiles.length}) के सभी गाने शामिल`
+                  : `Internal (${internalFiles.length}) + SD Card/MicroSD (${sdCardFiles.length}) tracks loaded`}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={handleDeepScanCategory}
+            disabled={isScanning}
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold rounded-xl shrink-0 flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer text-xs"
+          >
+            <RefreshCw size={13} className={isScanning ? 'animate-spin' : ''} />
+            <span>{isScanning ? (language === 'hi' ? 'स्कैनिंग...' : 'Scanning...') : (language === 'hi' ? 'पुनः स्कैन करें' : 'Rescan All')}</span>
+          </button>
+        </div>
+      )}
+
+      {/* Scan Feedback Notification */}
+      {scanMessage && (
+        <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-2xl text-xs text-blue-800 dark:text-blue-300 font-semibold flex items-center gap-2.5 animate-in fade-in shadow-2xs">
+          <RefreshCw size={15} className="animate-spin shrink-0 text-blue-600" />
+          <span>{scanMessage}</span>
+        </div>
+      )}
 
       {/* Search Input Filter */}
       {showSearch && (

@@ -219,7 +219,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     >
       <div className="w-full max-w-2xl mx-auto h-full flex flex-col">
         {/* Full Screen Top Header Bar */}
-        <div className="sticky top-0 z-20 flex items-center justify-between px-4 sm:px-6 py-3.5 bg-white/95 dark:bg-[#1f2420]/95 backdrop-blur-md border-b border-neutral-200/80 dark:border-neutral-800 shadow-2xs">
+        <div className="sticky top-0 z-20 flex items-center justify-between px-4 sm:px-6 pt-[max(2.75rem,calc(env(safe-area-inset-top)+0.75rem))] sm:pt-3.5 pb-3.5 bg-white/95 dark:bg-[#1f2420]/95 backdrop-blur-md border-b border-neutral-200/80 dark:border-neutral-800 shadow-2xs">
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}

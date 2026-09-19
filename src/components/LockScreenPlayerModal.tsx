@@ -83,10 +83,10 @@ export const LockScreenPlayerModal: React.FC<LockScreenPlayerModalProps> = ({
     return () => clearInterval(timer);
   }, [language]);
 
-  // Network speed fluctuations (e.g., 0.00 KB/s as in screenshot)
+  // Network speed fluctuations (0.55 KB/s as in screenshot)
   useEffect(() => {
     if (!isOpen) return;
-    const speeds = ['0.00 KB/s', '1.24 KB/s', '0.00 KB/s', '2.10 KB/s'];
+    const speeds = ['0.55 KB/s', '1.24 KB/s', '0.42 KB/s', '2.10 KB/s'];
     let idx = 0;
     const speedTimer = setInterval(() => {
       idx = (idx + 1) % speeds.length;
@@ -163,16 +163,16 @@ export const LockScreenPlayerModal: React.FC<LockScreenPlayerModalProps> = ({
         <div className="absolute inset-0 bg-white/35 backdrop-blur-xs pointer-events-none z-30 animate-pulse transition-opacity duration-300" />
       )}
 
-      {/* 1. TOP STATUS BAR (Exact match to screenshot: Jio True5G – Vi India, 0.00 KB/s, Vo5G 1, VoLTE 2, 5G+, Battery 46%) */}
+      {/* 1. TOP STATUS BAR (Exact match to screenshot 2: JIO 4G — Vi India, 0.55 KB/s, Vo5G 1, VoLTE 2, 5G+, Battery 36%) */}
       <div className="w-full flex items-center justify-between text-xs text-white/95 z-20 pt-safe font-sans select-none">
-        {/* Left: Carrier */}
+        {/* Left: Carrier matching Screenshot */}
         <div className="flex items-center gap-1.5 font-medium tracking-tight text-[13px] text-white drop-shadow-xs">
-          <span>Jio True5G – Vi India</span>
+          <span>JIO 4G — Vi India</span>
         </div>
 
-        {/* Right: Network speed, Vo5G/VoLTE, Signal Bars, 5G+, Battery with 46% */}
+        {/* Right: Network speed, Vo5G/VoLTE, Signal Bars, 5G+, Battery with 36% */}
         <div className="flex items-center gap-1.5 text-[11px] font-sans text-white drop-shadow-xs">
-          {/* Live speed meter */}
+          {/* Live speed meter (0.55 KB/s in screenshot) */}
           <div className="flex flex-col items-end leading-none text-[9px] font-mono mr-0.5">
             <span>{networkSpeed.split(' ')[0]}</span>
             <span className="text-[8px] opacity-80">{networkSpeed.split(' ')[1]}</span>
@@ -196,31 +196,31 @@ export const LockScreenPlayerModal: React.FC<LockScreenPlayerModalProps> = ({
           {/* 5G+ Badge */}
           <span className="text-[10px] font-bold tracking-tight px-0.5">5G+</span>
 
-          {/* Battery pill with 46% inside (as in screenshot) */}
+          {/* Battery pill with 36% inside (as in screenshot 2) */}
           <div className="relative flex items-center">
             <div className="w-7 h-3.5 border border-white/90 rounded-full px-1 flex items-center justify-center relative">
-              <span className="text-[9px] font-bold text-white leading-none">46</span>
+              <span className="text-[9px] font-bold text-white leading-none">36</span>
               <div 
                 className="absolute left-0.5 top-0.5 bottom-0.5 bg-white/30 rounded-full pointer-events-none"
-                style={{ width: '46%' }}
+                style={{ width: '36%' }}
               />
             </div>
           </div>
         </div>
       </div>
 
-      {/* 2. BIG DIGITAL CLOCK & DATE (Exact Android Lockscreen layout: Sat, Sep 19 on top, then huge 3:01) */}
-      <div className="w-full text-center mt-6 sm:mt-10 z-20 space-y-0.5">
-        <p className="text-base sm:text-lg font-normal tracking-wide text-white/95 drop-shadow-sm">
+      {/* 2. BIG DIGITAL CLOCK & DATE (Exact Android Lockscreen layout: Sat, Sep 19 on top, then huge 3:40 bold clock) */}
+      <div className="w-full text-center mt-4 sm:mt-6 z-20 space-y-0.5">
+        <p className="text-base sm:text-lg font-medium tracking-wide text-white/95 drop-shadow-sm">
           {dateStr}
         </p>
-        <h1 className="text-8xl sm:text-[110px] font-normal font-sans tracking-tight text-white leading-none drop-shadow-md py-1">
+        <h1 className="text-[96px] sm:text-[114px] font-bold font-sans tracking-tight text-white leading-none drop-shadow-md py-0.5">
           {timeStr}
         </h1>
       </div>
 
-      {/* 3. HERO MP3 PLAYER CARD (Exact Pixel-to-Pixel match to the User's Red Box!) */}
-      <div className="w-full z-20 my-auto py-2">
+      {/* 3. HERO MP3 PLAYER CARD (Positioned directly under the clock, exactly matching User's Red Box in Screenshot!) */}
+      <div className="w-full z-20 mt-3 sm:mt-4 mb-auto">
         <AndroidMediaCard
           file={file}
           isPlaying={isPlaying}
@@ -235,54 +235,59 @@ export const LockScreenPlayerModal: React.FC<LockScreenPlayerModalProps> = ({
         />
       </div>
 
-      {/* 4. BOTTOM SHORTCUTS & UNLOCK (Flashlight on Left, Camera on Right, Unlock in Center) */}
-      <div className="w-full flex items-center justify-between z-20 pb-safe pt-4 px-2">
-        {/* Flashlight Shortcut (Circular Button with Flashlight Icon) */}
-        <button
-          id="btn-lockscreen-flashlight"
-          type="button"
-          onClick={() => {
-            triggerHapticFeedback();
-            setIsFlashlightOn(!isFlashlightOn);
-          }}
-          className={`w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-lg ${
-            isFlashlightOn 
-              ? 'bg-amber-400 text-neutral-950 shadow-amber-400/50' 
-              : 'bg-white/20 hover:bg-white/30 text-white'
-          }`}
-          title={isFlashlightOn ? 'Turn Flashlight Off' : 'Turn Flashlight On'}
-        >
-          <Flashlight size={22} className={isFlashlightOn ? 'fill-neutral-950 text-neutral-950' : 'text-neutral-950'} />
-        </button>
+      {/* 4. BOTTOM SHORTCUTS & UNLOCK (Flashlight on Left, Camera on Right, Unlock in Center, Home indicator) */}
+      <div className="w-full flex flex-col z-20 pb-safe pt-2">
+        <div className="w-full flex items-center justify-between px-2">
+          {/* Flashlight Shortcut (Circular Button with Flashlight Icon) */}
+          <button
+            id="btn-lockscreen-flashlight"
+            type="button"
+            onClick={() => {
+              triggerHapticFeedback();
+              setIsFlashlightOn(!isFlashlightOn);
+            }}
+            className={`w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-lg ${
+              isFlashlightOn 
+                ? 'bg-amber-400 text-neutral-950 shadow-amber-400/50' 
+                : 'bg-white/20 hover:bg-white/30 text-white'
+            }`}
+            title={isFlashlightOn ? 'Turn Flashlight Off' : 'Turn Flashlight On'}
+          >
+            <Flashlight size={22} className={isFlashlightOn ? 'fill-neutral-950 text-neutral-950' : 'text-neutral-950'} />
+          </button>
 
-        {/* Center: Tap or Swipe up to unlock */}
-        <button
-          id="btn-lockscreen-unlock-hint"
-          type="button"
-          onClick={() => {
-            triggerHapticFeedback();
-            onClose();
-          }}
-          className="text-center cursor-pointer group active:scale-95 transition-transform px-4 py-2"
-        >
-          <span className="text-[11px] sm:text-xs text-white/75 font-normal tracking-wide group-hover:text-white transition-colors">
-            {language === 'hi' ? 'अनलॉक करने के लिए ऊपर स्वाइप करें' : 'Swipe up to unlock'}
-          </span>
-        </button>
+          {/* Center: Tap or Swipe up to unlock */}
+          <button
+            id="btn-lockscreen-unlock-hint"
+            type="button"
+            onClick={() => {
+              triggerHapticFeedback();
+              onClose();
+            }}
+            className="text-center cursor-pointer group active:scale-95 transition-transform px-4 py-2"
+          >
+            <span className="text-[11px] sm:text-xs text-white/75 font-normal tracking-wide group-hover:text-white transition-colors">
+              {language === 'hi' ? 'अनलॉक करने के लिए ऊपर स्वाइप करें' : 'Swipe up to unlock'}
+            </span>
+          </button>
 
-        {/* Camera Shortcut (Circular Button with Camera Icon) */}
-        <button
-          id="btn-lockscreen-camera"
-          type="button"
-          onClick={() => {
-            triggerHapticFeedback();
-            onClose();
-          }}
-          className="w-12 h-12 rounded-full bg-white/20 hover:bg-white/30 active:scale-95 backdrop-blur-md flex items-center justify-center text-neutral-950 transition-all cursor-pointer shadow-lg"
-          title="Open Camera"
-        >
-          <Camera size={22} />
-        </button>
+          {/* Camera Shortcut (Circular Button with Camera Icon) */}
+          <button
+            id="btn-lockscreen-camera"
+            type="button"
+            onClick={() => {
+              triggerHapticFeedback();
+              onClose();
+            }}
+            className="w-12 h-12 rounded-full bg-white/20 hover:bg-white/30 active:scale-95 backdrop-blur-md flex items-center justify-center text-neutral-950 transition-all cursor-pointer shadow-lg"
+            title="Open Camera"
+          >
+            <Camera size={22} />
+          </button>
+        </div>
+
+        {/* Home gesture bar indicator */}
+        <div className="w-32 h-1 bg-white/40 rounded-full mx-auto mt-3 mb-1" />
       </div>
 
       {/* 5. ANDROID MATERIAL YOU MEDIA OUTPUT BOTTOM SHEET (Opened via Cast Icon on the Card) */}

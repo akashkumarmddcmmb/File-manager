@@ -22,8 +22,17 @@ export function classifyFile(filename: string, mime?: string): FileClassificatio
   const lowerMime = (mime || '').toLowerCase();
 
   // 1. Audio check
-  const audioExtensions = ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'opus', 'wma', 'amr', 'mid', 'midi', 'aiff', 'alac', 'ape', 'ac3', 'dts', 'mka', 'ra', 'pcm'];
-  if (lowerMime.startsWith('audio/') || audioExtensions.includes(ext)) {
+  const audioExtensions = [
+    'mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'opus', 'wma', 'amr', 
+    'mid', 'midi', 'aiff', 'alac', 'ape', 'ac3', 'dts', 'mka', 'ra', 
+    'pcm', 'm4b', 'm4p', 'm4r', '3ga', 'awb', 'caf', 'weba', 'oga', 
+    'spx', 'mp2', 'mp1', 'mpa', 'aif', 'snd', 'au', 'dsd', 'dsf', 'dff'
+  ];
+  if (
+    lowerMime.startsWith('audio/') || 
+    lowerMime.includes('audio') ||
+    audioExtensions.includes(ext)
+  ) {
     return {
       type: 'audio',
       mimeType: mime || `audio/${ext === 'mp3' ? 'mpeg' : ext}`,
@@ -131,7 +140,19 @@ export function isFileInCategory(file: FileItem, category: FileCategory): boolea
     case 'audio': {
       if (file.type === 'audio') return true;
       const { category: cat } = classifyFile(file.name, file.mimeType);
-      return cat === 'audio';
+      if (cat === 'audio') return true;
+      const ext = getFileExtension(file.name);
+      const audioExtensions = [
+        'mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'opus', 'wma', 'amr', 
+        'mid', 'midi', 'aiff', 'alac', 'ape', 'ac3', 'dts', 'mka', 'ra', 
+        'pcm', 'm4b', 'm4p', 'm4r', '3ga', 'awb', 'caf', 'weba', 'oga', 
+        'spx', 'mp2', 'mp1', 'mpa', 'aif', 'snd', 'au', 'dsd', 'dsf', 'dff'
+      ];
+      if (audioExtensions.includes(ext)) return true;
+      if (file.mimeType && file.mimeType.toLowerCase().startsWith('audio/')) return true;
+      const fold = (file.folder || '').toLowerCase();
+      if ((fold.includes('/music') || fold.includes('/recordings') || fold.includes('audio') || fold.includes('songs')) && audioExtensions.includes(ext)) return true;
+      return false;
     }
 
     case 'documents': {
