@@ -7,7 +7,6 @@ import {
   ExternalLink, 
   ZoomIn, 
   ZoomOut, 
-  RotateCw, 
   FileText, 
   Copy, 
   Check, 
@@ -15,8 +14,11 @@ import {
   Maximize2,
   Minimize2,
   BookOpen,
-  Sparkles,
-  Printer
+  Printer,
+  Eye,
+  Layers,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { FileItem, Language } from '../types';
 import { formatBytes } from '../utils/storage';
@@ -35,14 +37,14 @@ export const PdfDocumentViewerModal: React.FC<PdfDocumentViewerModalProps> = ({
   file,
   language,
   onClose,
-  onToggleStar,
 }) => {
   const [zoomLevel, setZoomLevel] = useState(100);
   const [copied, setCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(false); // Reader paper theme
   const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false);
+  const [renderMode, setRenderMode] = useState<'reader' | 'embed'>('reader');
 
   if (!isOpen || !file) return null;
 
@@ -59,6 +61,11 @@ export const PdfDocumentViewerModal: React.FC<PdfDocumentViewerModalProps> = ({
     }
   };
 
+  const handlePrint = () => {
+    triggerHapticFeedback();
+    window.print();
+  };
+
   const handleDownload = () => {
     triggerHapticFeedback();
     if (file.url) {
@@ -72,7 +79,7 @@ export const PdfDocumentViewerModal: React.FC<PdfDocumentViewerModalProps> = ({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = file.name;
+      a.download = file.name.replace(/\.pdf$/i, '.txt');
       a.click();
       URL.revokeObjectURL(url);
     }
@@ -89,40 +96,86 @@ export const PdfDocumentViewerModal: React.FC<PdfDocumentViewerModalProps> = ({
     }
   };
 
+  // Helper to render markdown-like content cleanly for PDF document pages
+  const renderDocumentContent = (text: string) => {
+    if (!text) return null;
+    const lines = text.split('\n');
+    return lines.map((line, idx) => {
+      const trimmed = line.trim();
+      if (!trimmed) return <div key={idx} className="h-3" />;
+      if (trimmed.startsWith('# ')) {
+        return (
+          <h1 key={idx} className="text-xl sm:text-2xl font-extrabold my-3 pb-1 border-b border-neutral-300 text-neutral-900">
+            {trimmed.replace('# ', '')}
+          </h1>
+        );
+      }
+      if (trimmed.startsWith('## ')) {
+        return (
+          <h2 key={idx} className="text-lg sm:text-xl font-bold my-2 text-neutral-800">
+            {trimmed.replace('## ', '')}
+          </h2>
+        );
+      }
+      if (trimmed.startsWith('### ')) {
+        return (
+          <h3 key={idx} className="text-sm sm:text-base font-bold my-2 text-neutral-800">
+            {trimmed.replace('### ', '')}
+          </h3>
+        );
+      }
+      if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        return (
+          <li key={idx} className="ml-5 list-disc text-xs sm:text-sm my-1 text-neutral-800 leading-relaxed">
+            {trimmed.replace(/^[-*]\s+/, '')}
+          </li>
+        );
+      }
+      if (trimmed.startsWith('---')) {
+        return <hr key={idx} className="my-4 border-neutral-300" />;
+      }
+      return (
+        <p key={idx} className="text-xs sm:text-sm my-1.5 leading-relaxed text-neutral-800">
+          {trimmed}
+        </p>
+      );
+    });
+  };
+
   return (
     <div 
       className="fixed inset-0 z-50 w-full h-full bg-neutral-950 text-white flex flex-col justify-between select-none overflow-hidden animate-in fade-in duration-200"
       onClick={(e) => e.stopPropagation()}
     >
       {/* 1. TOP APP BAR */}
-      <div className="w-full px-4 py-3 pt-safe flex items-center justify-between border-b border-neutral-800 bg-neutral-900/90 backdrop-blur-md shrink-0">
-        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+      <div className="w-full px-3 sm:px-4 py-2.5 pt-safe flex items-center justify-between border-b border-neutral-800 bg-neutral-900/95 backdrop-blur-md shrink-0">
+        <div className="flex items-center gap-2 min-w-0 pr-2">
           <button
             onClick={() => {
               triggerHapticFeedback();
               onClose();
             }}
-            className="p-2.5 text-neutral-400 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer shrink-0"
+            className="p-2 text-neutral-400 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer shrink-0"
             title="Close"
           >
-            <X size={22} />
+            <X size={20} />
           </button>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
+              <span className="px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 text-[10px] font-bold uppercase tracking-wider">
                 {isPdf ? 'PDF' : 'DOC'}
               </span>
-              <h2 className="text-sm sm:text-base font-bold truncate text-white" title={file.name}>
+              <h2 className="text-xs sm:text-sm font-bold truncate text-white" title={file.name}>
                 {file.name}
               </h2>
             </div>
-            <p className="text-[11px] text-neutral-400 truncate">
+            <p className="text-[10px] text-neutral-400 truncate">
               {formatBytes(file.size)} • {file.folder}
             </p>
           </div>
         </div>
 
-        {/* Quick Actions */}
+        {/* Quick Actions Toolbar */}
         <div className="flex items-center gap-1 shrink-0">
           {/* Zoom Controls */}
           <div className="flex items-center bg-neutral-800 rounded-xl p-0.5 mr-1 text-xs border border-neutral-700/60">
@@ -134,9 +187,9 @@ export const PdfDocumentViewerModal: React.FC<PdfDocumentViewerModalProps> = ({
               className="p-1.5 text-neutral-300 hover:text-white hover:bg-neutral-700 rounded-lg transition-colors cursor-pointer"
               title="Zoom Out"
             >
-              <ZoomOut size={16} />
+              <ZoomOut size={15} />
             </button>
-            <span className="px-2 font-mono text-xs font-bold text-neutral-200 min-w-10 text-center">{zoomLevel}%</span>
+            <span className="px-1.5 font-mono text-[11px] font-bold text-neutral-200 min-w-8 text-center">{zoomLevel}%</span>
             <button
               onClick={() => {
                 triggerHapticFeedback();
@@ -145,32 +198,57 @@ export const PdfDocumentViewerModal: React.FC<PdfDocumentViewerModalProps> = ({
               className="p-1.5 text-neutral-300 hover:text-white hover:bg-neutral-700 rounded-lg transition-colors cursor-pointer"
               title="Zoom In"
             >
-              <ZoomIn size={16} />
+              <ZoomIn size={15} />
             </button>
           </div>
 
-          {/* Fullscreen Toggle */}
+          {/* Render Mode Switcher (Reader Sheet vs Embed/Iframe) */}
+          {resolvedUrl && (
+            <button
+              onClick={() => {
+                triggerHapticFeedback();
+                setRenderMode(renderMode === 'reader' ? 'embed' : 'reader');
+              }}
+              className={`p-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                renderMode === 'embed' ? 'bg-blue-600 text-white' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+              }`}
+              title={renderMode === 'reader' ? 'Switch to PDF Embed' : 'Switch to Reader View'}
+            >
+              <Layers size={16} />
+            </button>
+          )}
+
+          {/* Reading Mode Dark/Light Toggle */}
           <button
-            onClick={toggleBrowserFullscreen}
+            onClick={() => setIsDarkMode(!isDarkMode)}
             className="p-2 text-neutral-400 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
-            title={isBrowserFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+            title={isDarkMode ? 'Light Reading Paper' : 'Dark Reading Paper'}
           >
-            {isBrowserFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+            {isDarkMode ? <Sun size={18} className="text-amber-400" /> : <Moon size={18} />}
           </button>
 
-          {/* Open in external PDF reader */}
+          {/* Print PDF */}
+          <button
+            onClick={handlePrint}
+            className="p-2 text-neutral-400 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer hidden sm:block"
+            title="Print PDF"
+          >
+            <Printer size={18} />
+          </button>
+
+          {/* Open in Phone PDF Reader */}
           {file.url && (
             <button
               onClick={() => {
                 triggerHapticFeedback();
                 openRealFile(file.url!);
               }}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-              title={language === 'hi' ? 'फ़ोन PDF ऐप में खोलें' : 'Open in Phone PDF Reader'}
+              className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+              title={language === 'hi' ? 'फ़ोन PDF ऐप में खोलें' : 'Open in Phone App'}
             >
-              <ExternalLink size={15} />
+              <ExternalLink size={14} />
               <span className="hidden sm:inline">
-                {language === 'hi' ? 'PDF ऐप में खोलें' : 'Open in App'}
+                {language === 'hi' ? 'ऐप में खोलें' : 'Open in App'}
               </span>
             </button>
           )}
@@ -179,12 +257,12 @@ export const PdfDocumentViewerModal: React.FC<PdfDocumentViewerModalProps> = ({
           <button
             onClick={() => {
               triggerHapticFeedback();
-              if (file.url) shareNativeFile(file.name, `Document: ${file.name}`, file.url);
+              if (file.url) shareNativeFile(file.name, `PDF Document: ${file.name}`, file.url);
             }}
             className="p-2 text-neutral-400 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
             title="Share"
           >
-            <Share2 size={20} />
+            <Share2 size={18} />
           </button>
 
           {/* Download */}
@@ -193,58 +271,83 @@ export const PdfDocumentViewerModal: React.FC<PdfDocumentViewerModalProps> = ({
             className="p-2 text-neutral-400 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
             title="Download"
           >
-            <Download size={20} />
+            <Download size={18} />
           </button>
         </div>
       </div>
 
-      {/* 2. DOCUMENT CONTENT FULL SCREEN VIEWPORT */}
-      <div className="flex-1 w-full bg-neutral-950 overflow-auto relative p-2 sm:p-4 flex flex-col items-center">
-        {isPdf ? (
-          <div className="w-full h-full flex flex-col items-center justify-between rounded-2xl overflow-hidden bg-neutral-900 border border-neutral-800 shadow-2xl">
-            {resolvedUrl ? (
-              <iframe
-                src={`${resolvedUrl}#toolbar=1&navpanes=1&scrollbar=1&zoom=${zoomLevel}`}
-                title={file.name}
-                className="w-full h-full border-none bg-white rounded-xl"
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
-                <div className="w-20 h-20 rounded-3xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shadow-inner">
-                  <FileText size={44} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-white">{file.name}</h3>
-                  <p className="text-xs text-neutral-400 mt-1">{formatBytes(file.size)}</p>
-                </div>
-                {file.url && (
-                  <button
-                    onClick={() => openRealFile(file.url!)}
-                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 shadow-lg transition-all"
-                  >
-                    <ExternalLink size={16} /> Open with Adobe Acrobat / Google Drive
-                  </button>
-                )}
-              </div>
-            )}
+      {/* 2. DOCUMENT VIEWPORT AREA */}
+      <div className="flex-1 w-full bg-neutral-950 overflow-auto p-2 sm:p-6 flex flex-col items-center justify-start">
+        {renderMode === 'embed' && resolvedUrl ? (
+          <div className="w-full max-w-5xl h-full flex flex-col items-center justify-between rounded-2xl overflow-hidden bg-neutral-900 border border-neutral-800 shadow-2xl">
+            <iframe
+              src={`${resolvedUrl}#toolbar=1&navpanes=1&scrollbar=1&zoom=${zoomLevel}`}
+              title={file.name}
+              className="w-full h-full border-none bg-white"
+            />
           </div>
         ) : (
-          <div className="w-full max-w-4xl h-full flex flex-col bg-neutral-900 rounded-2xl border border-neutral-800 overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-4 py-2 bg-neutral-800/80 border-b border-neutral-700 text-xs text-neutral-300">
-              <span className="font-semibold">{file.name} (Plain Text / Document)</span>
-              <button
-                onClick={handleCopyText}
-                className="flex items-center gap-1.5 px-3 py-1 bg-neutral-700 hover:bg-neutral-600 text-white rounded-lg transition-colors cursor-pointer"
-              >
-                {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                <span>{copied ? 'Copied!' : 'Copy Text'}</span>
-              </button>
-            </div>
+          /* A4 DOCUMENT PAGE READER VIEW */
+          <div className="w-full max-w-3xl flex flex-col items-center my-2 animate-in fade-in duration-200">
+            {/* PDF Sheet Page Frame */}
             <div 
-              className="flex-1 p-6 overflow-y-auto font-mono text-xs sm:text-sm leading-relaxed text-neutral-200 whitespace-pre-wrap selection:bg-blue-600"
-              style={{ fontSize: `${(zoomLevel / 100) * 14}px` }}
+              className={`w-full min-h-[80vh] p-6 sm:p-12 rounded-2xl shadow-2xl transition-all duration-200 border ${
+                isDarkMode 
+                  ? 'bg-neutral-900 text-neutral-100 border-neutral-800' 
+                  : 'bg-white text-neutral-900 border-neutral-200'
+              }`}
+              style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
             >
-              {file.content || 'No text content available to preview.'}
+              {/* PDF Document Header */}
+              <div className="flex items-center justify-between pb-4 mb-6 border-b border-neutral-200 dark:border-neutral-800 text-xs">
+                <div className="flex items-center gap-2">
+                  <BookOpen size={16} className="text-rose-600" />
+                  <span className="font-bold uppercase tracking-wider text-rose-600">PDF Reader • Page 1 of 1</span>
+                </div>
+                <button
+                  onClick={handleCopyText}
+                  className="px-2.5 py-1 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                >
+                  {copied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                  <span>{copied ? 'Copied!' : 'Copy Text'}</span>
+                </button>
+              </div>
+
+              {/* Title & Metadata */}
+              <div className="mb-6">
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight mb-1 text-neutral-900 dark:text-white">
+                  {file.name}
+                </h1>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  Document Size: {formatBytes(file.size)} • Path: {file.folder}
+                </p>
+              </div>
+
+              {/* PDF Content Body */}
+              <div className="prose dark:prose-invert max-w-none">
+                {file.content ? (
+                  renderDocumentContent(file.content)
+                ) : (
+                  <div className="py-12 text-center text-neutral-400 space-y-4">
+                    <FileText size={48} className="mx-auto text-rose-500 opacity-80" />
+                    <p className="text-sm font-semibold">PDF Document Preview Ready</p>
+                    {file.url && (
+                      <button
+                        onClick={() => openRealFile(file.url!)}
+                        className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl text-xs font-bold inline-flex items-center gap-2 shadow-md transition-all"
+                      >
+                        <ExternalLink size={15} /> Open in PDF App / फ़ोन में खोलें
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* PDF Footer Page Indicator */}
+              <div className="mt-12 pt-4 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between text-[11px] text-neutral-400">
+                <span>Files by Akash Kumar</span>
+                <span>Page 1 / 1</span>
+              </div>
             </div>
           </div>
         )}

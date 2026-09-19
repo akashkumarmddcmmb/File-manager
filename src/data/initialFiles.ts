@@ -382,8 +382,9 @@ export const initialFiles: FileItem[] = [
     storageDevice: 'internal',
     createdAt: '2026-09-02T15:20:00Z',
     updatedAt: '2026-09-02T15:20:00Z',
+    url: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf',
     thumbnail: 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=300&auto=format&fit=crop&q=60',
-    content: `# Curriculum Vitae\n\n**Candidate:** Akash Kumar (Full-Stack & Mobile Developer)\n**Email:** akashkumarmddcmmb@gmail.com\n\n### Summary\nExperienced developer specializing in React, TypeScript, Android and Cloud architectures.\n\n### Skills\n- Frontend: React 19, TypeScript, Tailwind CSS, Material 3\n- Mobile: Android, Native Architecture, Offline Sync\n- Backend: Node.js, Express, SQLite, Cloud APIs\n\n### Projects\n- **Files by Akash Kumar**: High fidelity file manager with storage cleaner, nearby sharing, category filters, and safe vault.`,
+    content: `# CURRICULUM VITAE - AKASH KUMAR\n\n**Candidate:** Akash Kumar (Full-Stack & Mobile Software Engineer)\n**Email:** akashkumarmddcmmb@gmail.com\n**Location:** New Delhi / Remote\n\n---\n\n### PROFESSIONAL SUMMARY\nHighly skilled Full-Stack & Mobile Developer specializing in React, TypeScript, Tailwind CSS, Android Native APIs, and Cloud Architectures. Experienced in building high-performance file management solutions, offline-first storage sync engines, and responsive user interfaces.\n\n---\n\n### TECHNICAL SKILLS\n- **Languages & Frameworks:** TypeScript, JavaScript (ES2024), React 19, Node.js, Express, HTML5, CSS3\n- **Mobile Development:** Capacitor, Android WebView Native Integration, PWA, Responsive UI\n- **Styling & UI:** Tailwind CSS v4, Lucide Icons, Framer Motion, Material Design 3\n- **Tools & Platforms:** Git, GitHub Actions, Vite, Bun, Cloud Run\n\n---\n\n### FEATURED PROJECTS\n- **Files by Akash Kumar:** A feature-rich mobile file manager with storage cleaner, category filters, internal & SD card explorer, safe vault with PIN, and high-speed offline file transfers.`,
     isStarred: true,
   },
   {
@@ -451,8 +452,9 @@ export const initialFiles: FileItem[] = [
     storageDevice: 'sdcard',
     createdAt: '2026-07-18T10:30:00Z',
     updatedAt: '2026-07-18T10:30:00Z',
+    url: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf',
     thumbnail: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=300&auto=format&fit=crop&q=60',
-    content: `# Engineering Reference Manual\n\nComprehensive compilation of computer science fundamentals, data structures, algorithms, and system design.`,
+    content: `# COMPUTER SCIENCE & ENGINEERING REFERENCE MANUAL\n\n**Module 1: Data Structures & Algorithms**\n- Arrays, Linked Lists, Trees, Binary Search Trees (BST), AVL Trees, Heaps\n- Sorting Algorithms: QuickSort, MergeSort, HeapSort (Time complexity analysis O(N log N))\n- Graph Algorithms: Dijkstra's Shortest Path, BFS, DFS, Kruskal's MST\n\n**Module 2: Operating Systems & Storage Systems**\n- Process Management: Scheduling algorithms (Round Robin, Priority Scheduling, Shortest Job First)\n- Memory Allocation: Virtual Memory, Paging, Segmentation, LRU Cache Eviction\n- Storage & File Systems: Ext4, NTFS, FAT32, Android Storage Access Framework (SAF)\n\n**Module 3: Database & Cloud Architectures**\n- Relational DBs: SQL Queries, Indexing, Transactions (ACID properties)\n- NoSQL & Key-Value Stores: IndexedDB, SQLite, Firebase Firestore\n- Distributed Systems: Microservices, RESTful APIs, WebSockets, Load Balancing`,
   },
 
   // ==========================================
