@@ -340,6 +340,224 @@ export async function getRealStorageVolumes(): Promise<{
 }
 
 /**
+ * Accurately detects whether a given file path belongs to internal phone storage or external SD card
+ */
+export function detectStorageDevice(filePath: string, explicitDevice?: 'internal' | 'sdcard'): 'internal' | 'sdcard' {
+  if (explicitDevice === 'sdcard') return 'sdcard';
+  if (explicitDevice === 'internal') return 'internal';
+  if (!filePath) return 'internal';
+
+  const lower = filePath.toLowerCase();
+
+  // Internal storage signatures
+  if (
+    lower.includes('/storage/emulated/') ||
+    lower.includes('/storage/self/primary') ||
+    lower.startsWith('/sdcard/') ||
+    lower === '/sdcard'
+  ) {
+    return 'internal';
+  }
+
+  // SD card UUID format /storage/XXXX-XXXX (e.g. /storage/0000-0000 or /storage/ABCD-1234)
+  if (/\/storage\/[0-9a-f]{4}-[0-9a-f]{4}/i.test(filePath)) {
+    return 'sdcard';
+  }
+
+  // Common external SD card mount keywords
+  if (
+    lower.includes('sdcard1') ||
+    lower.includes('extsdcard') ||
+    lower.includes('external_sd') ||
+    lower.includes('media_rw') ||
+    lower.includes('micro_sd') ||
+    lower.includes('microsd') ||
+    lower.includes('removable') ||
+    lower.includes('sd-') ||
+    lower.includes('sdcard')
+  ) {
+    return 'sdcard';
+  }
+
+  // Any other mount directly under /storage/ that is not emulated or self
+  if (lower.startsWith('/storage/') && !lower.includes('emulated') && !lower.includes('/self/')) {
+    return 'sdcard';
+  }
+
+  return 'internal';
+}
+
+/**
+ * Deep scans an SD card path for media files, with special focus on Audio, Music, Recordings, Downloads
+ */
+export async function scanSdCardMediaFiles(
+  sdCardPath: string, 
+  targetCategory?: string
+): Promise<{ files: FileItem[]; folders: FolderItem[] }> {
+  const foundFiles: FileItem[] = [];
+  const foundFolders: FolderItem[] = [];
+  const seenPaths = new Set<string>();
+
+  try {
+    // 1. List root of SD card
+    const rootListing = await RealDeviceStorage.listDirectory({ path: sdCardPath }).catch(() => null);
+    if (!rootListing) return { files: foundFiles, folders: foundFolders };
+
+    const foldersToScan: string[] = [];
+
+    // Collect root folders
+    if (rootListing.folders) {
+      for (const fold of rootListing.folders) {
+        foundFolders.push({
+          id: fold.id,
+          name: fold.name,
+          path: fold.path,
+          parentPath: fold.parentPath,
+          storageDevice: 'sdcard',
+          createdAt: new Date(fold.lastModified || Date.now()).toISOString(),
+        });
+        foldersToScan.push(fold.path);
+      }
+    }
+
+    // Process root files
+    if (rootListing.files) {
+      for (const f of rootListing.files) {
+        const key = f.path || f.name;
+        if (!seenPaths.has(key)) {
+          seenPaths.add(key);
+          const classification = classifyFile(f.name, f.mimeType);
+          const resolvedType = f.type && f.type !== 'other' ? f.type : classification.type;
+
+          if (!targetCategory || classification.category === targetCategory || resolvedType === targetCategory) {
+            foundFiles.push({
+              id: f.id,
+              name: f.name,
+              size: f.size,
+              type: resolvedType,
+              mimeType: f.mimeType || classification.mimeType,
+              folder: f.folder || '/SD Card',
+              storageDevice: 'sdcard',
+              url: f.path,
+              thumbnail: resolvedType === 'image' || resolvedType === 'video' ? (resolveMediaSrc(f.path) || f.path) : undefined,
+              createdAt: new Date(f.lastModified || Date.now()).toISOString(),
+              updatedAt: new Date(f.lastModified || Date.now()).toISOString(),
+            });
+          }
+        }
+      }
+    }
+
+    // Standard media directories to always ensure we check on SD Card
+    const candidateMediaFolderNames = [
+      'Music', 'Audio', 'Songs', 'Recordings', 'Download', 'Downloads', 
+      'Podcasts', 'Ringtones', 'Notifications', 'Alarms', 'DCIM', 'Movies', 
+      'Media', 'Albums', 'WhatsApp/Media/WhatsApp Audio', 'Voice'
+    ];
+
+    for (const cand of candidateMediaFolderNames) {
+      const fullCandPath = `${sdCardPath.replace(/\/+$/, '')}/${cand}`;
+      if (!foldersToScan.includes(fullCandPath)) {
+        foldersToScan.push(fullCandPath);
+      }
+    }
+
+    // Now scan each folder (and subfolders like Music/Albums)
+    for (const folderPath of foldersToScan) {
+      try {
+        const dirRes = await RealDeviceStorage.listDirectory({ path: folderPath }).catch(() => null);
+        if (!dirRes) continue;
+
+        // Subfolders inside this folder (e.g. Music/Albums, Music/Artists)
+        const nestedFolders: string[] = [];
+        if (dirRes.folders) {
+          for (const subFold of dirRes.folders) {
+            foundFolders.push({
+              id: subFold.id,
+              name: subFold.name,
+              path: subFold.path,
+              parentPath: subFold.parentPath,
+              storageDevice: 'sdcard',
+              createdAt: new Date(subFold.lastModified || Date.now()).toISOString(),
+            });
+            nestedFolders.push(subFold.path);
+          }
+        }
+
+        // Files inside this folder
+        if (dirRes.files) {
+          for (const f of dirRes.files) {
+            const key = f.path || f.name;
+            if (!seenPaths.has(key)) {
+              seenPaths.add(key);
+              const classification = classifyFile(f.name, f.mimeType);
+              const resolvedType = f.type && f.type !== 'other' ? f.type : classification.type;
+
+              if (!targetCategory || classification.category === targetCategory || resolvedType === targetCategory) {
+                foundFiles.push({
+                  id: f.id,
+                  name: f.name,
+                  size: f.size,
+                  type: resolvedType,
+                  mimeType: f.mimeType || classification.mimeType,
+                  folder: f.folder || folderPath,
+                  storageDevice: 'sdcard',
+                  url: f.path,
+                  thumbnail: resolvedType === 'image' || resolvedType === 'video' ? (resolveMediaSrc(f.path) || f.path) : undefined,
+                  createdAt: new Date(f.lastModified || Date.now()).toISOString(),
+                  updatedAt: new Date(f.lastModified || Date.now()).toISOString(),
+                });
+              }
+            }
+          }
+        }
+
+        // Scan nested subfolders (e.g. Albums inside Music)
+        for (const nestedPath of nestedFolders.slice(0, 10)) {
+          try {
+            const nestedRes = await RealDeviceStorage.listDirectory({ path: nestedPath }).catch(() => null);
+            if (nestedRes && nestedRes.files) {
+              for (const f of nestedRes.files) {
+                const key = f.path || f.name;
+                if (!seenPaths.has(key)) {
+                  seenPaths.add(key);
+                  const classification = classifyFile(f.name, f.mimeType);
+                  const resolvedType = f.type && f.type !== 'other' ? f.type : classification.type;
+
+                  if (!targetCategory || classification.category === targetCategory || resolvedType === targetCategory) {
+                    foundFiles.push({
+                      id: f.id,
+                      name: f.name,
+                      size: f.size,
+                      type: resolvedType,
+                      mimeType: f.mimeType || classification.mimeType,
+                      folder: f.folder || nestedPath,
+                      storageDevice: 'sdcard',
+                      url: f.path,
+                      thumbnail: resolvedType === 'image' || resolvedType === 'video' ? (resolveMediaSrc(f.path) || f.path) : undefined,
+                      createdAt: new Date(f.lastModified || Date.now()).toISOString(),
+                      updatedAt: new Date(f.lastModified || Date.now()).toISOString(),
+                    });
+                  }
+                }
+              }
+            }
+          } catch {
+            // Nested scan fallback
+          }
+        }
+      } catch {
+        // Folder scan fallback
+      }
+    }
+  } catch (err) {
+    console.warn('Error scanning SD card media files:', err);
+  }
+
+  return { files: foundFiles, folders: foundFolders };
+}
+
+/**
  * Scan real files and folders from the device
  */
 export async function scanNativeStorage(): Promise<{
@@ -375,6 +593,7 @@ export async function scanNativeStorage(): Promise<{
         
         const classification = classifyFile(f.name, f.mimeType);
         const resolvedType = f.type && f.type !== 'other' ? f.type : classification.type;
+        const device = detectStorageDevice(f.path, f.storageDevice);
 
         collectedFiles.push({
           id: f.id,
@@ -383,7 +602,7 @@ export async function scanNativeStorage(): Promise<{
           type: resolvedType,
           mimeType: f.mimeType || classification.mimeType,
           folder: f.folder,
-          storageDevice: f.storageDevice || (f.path.includes('emulated') ? 'internal' : 'sdcard'),
+          storageDevice: device,
           url: f.path,
           thumbnail: resolvedType === 'image' || resolvedType === 'video' ? webUrl : undefined,
           createdAt: new Date(f.lastModified || Date.now()).toISOString(),
@@ -402,6 +621,7 @@ export async function scanNativeStorage(): Promise<{
 
             const classification = classifyFile(f.name, f.mimeType);
             const resolvedType = f.type && f.type !== 'other' ? f.type : classification.type;
+            const device = detectStorageDevice(f.path, f.storageDevice);
 
             collectedFiles.push({
               id: f.id,
@@ -410,7 +630,7 @@ export async function scanNativeStorage(): Promise<{
               type: resolvedType,
               mimeType: f.mimeType || classification.mimeType,
               folder: f.folder,
-              storageDevice: f.storageDevice || (f.path.includes('emulated') ? 'internal' : 'sdcard'),
+              storageDevice: device,
               url: f.path,
               thumbnail: resolvedType === 'image' || resolvedType === 'video' ? webUrl : undefined,
               createdAt: new Date(f.lastModified || Date.now()).toISOString(),
@@ -443,61 +663,57 @@ export async function scanNativeStorage(): Promise<{
           name: fold.name,
           path: fold.path,
           parentPath: fold.parentPath,
-          storageDevice: fold.storageDevice,
+          storageDevice: fold.storageDevice || detectStorageDevice(fold.path),
           createdAt: new Date(fold.lastModified || Date.now()).toISOString(),
         });
       }
     }
 
-    // Add SD card root if detected
-    if (volumes.sdcard) {
+    // 4. Discover SD card volumes: from getRealStorageVolumes OR checking /storage entries
+    const sdCardPaths: { name: string; path: string }[] = [];
+    if (volumes.sdcard && volumes.sdcard.path) {
+      sdCardPaths.push({ name: volumes.sdcard.name || 'SD Card', path: volumes.sdcard.path });
+    }
+
+    // Probe /storage for external SD cards
+    try {
+      const storageDir = await RealDeviceStorage.listDirectory({ path: '/storage' }).catch(() => null);
+      if (storageDir && storageDir.folders) {
+        for (const fold of storageDir.folders) {
+          const lower = fold.name.toLowerCase();
+          if (lower !== 'emulated' && lower !== 'self' && !sdCardPaths.some(p => p.path === fold.path)) {
+            sdCardPaths.push({
+              name: fold.name.length <= 10 && fold.name.includes('-') ? `SD Card (${fold.name})` : (fold.name || 'SD Card'),
+              path: fold.path,
+            });
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // Now scan each discovered SD card comprehensively
+    for (const sd of sdCardPaths) {
       collectedFolders.unshift({
-        id: 'sdcard-root',
-        name: volumes.sdcard.name,
-        path: volumes.sdcard.path,
+        id: `sdcard-${sd.name}`,
+        name: sd.name,
+        path: sd.path,
         parentPath: '',
         storageDevice: 'sdcard',
         createdAt: new Date().toISOString(),
       });
-      // Also list SD card root folders & files
-      try {
-        const sdList = await RealDeviceStorage.listDirectory({ path: volumes.sdcard.path });
-        if (sdList) {
-          if (sdList.folders) {
-            for (const fold of sdList.folders) {
-              collectedFolders.push({
-                id: fold.id,
-                name: fold.name,
-                path: fold.path,
-                parentPath: fold.parentPath,
-                storageDevice: 'sdcard',
-                createdAt: new Date(fold.lastModified || Date.now()).toISOString(),
-              });
-            }
-          }
-          if (sdList.files) {
-            for (const f of sdList.files) {
-              const key = f.path || f.name;
-              if (!seen.has(key)) {
-                seen.add(key);
-                uniqueFiles.push({
-                  id: f.id,
-                  name: f.name,
-                  size: f.size,
-                  type: f.type,
-                  mimeType: f.mimeType,
-                  folder: f.folder,
-                  storageDevice: 'sdcard',
-                  url: f.path,
-                  createdAt: new Date(f.lastModified || Date.now()).toISOString(),
-                  updatedAt: new Date(f.lastModified || Date.now()).toISOString(),
-                });
-              }
-            }
-          }
+
+      const sdMedia = await scanSdCardMediaFiles(sd.path);
+      for (const fold of sdMedia.folders) {
+        collectedFolders.push(fold);
+      }
+      for (const f of sdMedia.files) {
+        const key = f.url || f.name;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueFiles.push(f);
         }
-      } catch {
-        // SD read fallback
       }
     }
 
@@ -521,29 +737,76 @@ export async function scanCategoryFilesFromDevice(category: string): Promise<Fil
   if (!isNative) return null;
 
   try {
-    const res = await RealDeviceStorage.scanMediaCategory({ category });
-    if (!res || !res.files) return null;
+    const combinedFiles: FileItem[] = [];
+    const seen = new Set<string>();
 
-    return res.files.map(f => {
-      const webUrl = resolveMediaSrc(f.path) || f.path;
-      
-      const classification = classifyFile(f.name, f.mimeType);
-      const resolvedType = f.type && f.type !== 'other' ? f.type : classification.type;
+    // 1. Query Android MediaStore
+    try {
+      const res = await RealDeviceStorage.scanMediaCategory({ category });
+      if (res && res.files) {
+        for (const f of res.files) {
+          const webUrl = resolveMediaSrc(f.path) || f.path;
+          const classification = classifyFile(f.name, f.mimeType);
+          const resolvedType = f.type && f.type !== 'other' ? f.type : classification.type;
+          const device = detectStorageDevice(f.path, f.storageDevice);
 
-      return {
-        id: f.id,
-        name: f.name,
-        size: f.size,
-        type: resolvedType,
-        mimeType: f.mimeType || classification.mimeType,
-        folder: f.folder,
-        storageDevice: f.storageDevice || (f.path.includes('emulated') ? 'internal' : 'sdcard'),
-        url: f.path,
-        thumbnail: resolvedType === 'image' || resolvedType === 'video' ? webUrl : undefined,
-        createdAt: new Date(f.lastModified || Date.now()).toISOString(),
-        updatedAt: new Date(f.lastModified || Date.now()).toISOString(),
-      };
-    });
+          const item: FileItem = {
+            id: f.id,
+            name: f.name,
+            size: f.size,
+            type: resolvedType,
+            mimeType: f.mimeType || classification.mimeType,
+            folder: f.folder,
+            storageDevice: device,
+            url: f.path,
+            thumbnail: resolvedType === 'image' || resolvedType === 'video' ? webUrl : undefined,
+            createdAt: new Date(f.lastModified || Date.now()).toISOString(),
+            updatedAt: new Date(f.lastModified || Date.now()).toISOString(),
+          };
+          const key = item.url || item.name;
+          if (!seen.has(key)) {
+            seen.add(key);
+            combinedFiles.push(item);
+          }
+        }
+      }
+    } catch {
+      // media store fallback
+    }
+
+    // 2. Direct filesystem scan of SD Card for this category
+    const volumes = await getRealStorageVolumes();
+    const sdPaths: string[] = [];
+    if (volumes.sdcard?.path) {
+      sdPaths.push(volumes.sdcard.path);
+    }
+
+    try {
+      const storageDir = await RealDeviceStorage.listDirectory({ path: '/storage' }).catch(() => null);
+      if (storageDir && storageDir.folders) {
+        for (const fold of storageDir.folders) {
+          const lower = fold.name.toLowerCase();
+          if (lower !== 'emulated' && lower !== 'self' && !sdPaths.includes(fold.path)) {
+            sdPaths.push(fold.path);
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    for (const p of sdPaths) {
+      const sdRes = await scanSdCardMediaFiles(p, category);
+      for (const f of sdRes.files) {
+        const key = f.url || f.name;
+        if (!seen.has(key)) {
+          seen.add(key);
+          combinedFiles.push(f);
+        }
+      }
+    }
+
+    return combinedFiles;
   } catch (e) {
     console.warn('Category deep scan error:', e);
     return null;

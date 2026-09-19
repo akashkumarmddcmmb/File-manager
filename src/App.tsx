@@ -2304,6 +2304,7 @@ export default function App() {
         onPlayPauseAudio={() => setIsAudioPlaying(!isAudioPlaying)}
         onNextTrack={handleNextTrack}
         onPrevTrack={handlePrevTrack}
+        onOpenLockScreen={() => setIsLockScreenModalOpen(true)}
         language={language}
       />
 

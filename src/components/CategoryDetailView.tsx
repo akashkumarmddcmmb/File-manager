@@ -168,11 +168,13 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
       } else if (activeSubFilter === 'recordings') {
         list = list.filter(f => f.folder.toLowerCase().includes('record') || f.folder.toLowerCase().includes('voice') || /\.(m4a|amr|opus|wav)$/i.test(f.name));
       } else if (activeSubFilter === 'songs') {
-        list = list.filter(f => /\.(mp3|flac|wav|m4a|aac|ogg)$/i.test(f.name) && !f.folder.toLowerCase().includes('record'));
+        list = list.filter(f => /\.(mp3|flac|wav|m4a|aac|ogg|opus)$/i.test(f.name) && !f.folder.toLowerCase().includes('record'));
       } else if (activeSubFilter === 'starred') {
         list = list.filter(f => f.isStarred);
       } else if (activeSubFilter === 'sdcard_only') {
         list = list.filter(f => f.storageDevice === 'sdcard');
+      } else if (activeSubFilter === 'internal_only') {
+        list = list.filter(f => f.storageDevice !== 'sdcard');
       }
     }
 
@@ -489,8 +491,12 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
                   <h2 className="text-base sm:text-lg font-bold text-neutral-900 capitalize">
                     {categoryTitle()}
                   </h2>
-                  <p className="text-xs text-neutral-500 font-medium">
-                    {allCategoryFiles.length} {t.items} • {formatBytes(totalAllCategorySize)}
+                  <p className="text-xs text-neutral-500 font-medium flex items-center gap-1.5 flex-wrap">
+                    <span>{allCategoryFiles.length} {t.items} • {formatBytes(totalAllCategorySize)}</span>
+                    <span className="text-neutral-300">|</span>
+                    <span className="text-blue-600 font-semibold inline-flex items-center gap-0.5">📱 {internalFiles.length} {language === 'hi' ? 'इंटरनल' : 'Phone'}</span>
+                    <span className="text-neutral-300">|</span>
+                    <span className="text-purple-600 font-semibold inline-flex items-center gap-0.5">💾 {sdCardFiles.length} {language === 'hi' ? 'SD कार्ड' : 'SD Card'}</span>
                   </p>
                 </div>
               </div>
@@ -547,21 +553,113 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
         </div>
       )}
 
+      {/* Storage Source Selector Bar (All Storage vs Internal Phone vs SD Card) */}
+      <div className="flex items-center gap-1.5 p-1 bg-neutral-100/90 rounded-2xl border border-neutral-200/80 text-xs">
+        <button
+          type="button"
+          onClick={() => {
+            triggerHapticFeedback();
+            setStorageLocationFilter('all');
+            if (activeSubFilter === 'sdcard_only' || activeSubFilter === 'internal_only') {
+              setActiveSubFilter('all');
+            }
+          }}
+          className={`flex-1 py-1.5 px-2 rounded-xl font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            storageLocationFilter === 'all'
+              ? 'bg-white text-neutral-900 shadow-2xs font-bold'
+              : 'text-neutral-600 hover:text-neutral-900'
+          }`}
+        >
+          <Layers size={13} className={storageLocationFilter === 'all' ? 'text-blue-600' : 'text-neutral-400'} />
+          <span className="truncate">{language === 'hi' ? 'सभी स्टोरेज' : 'All'} ({allCategoryFiles.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            triggerHapticFeedback();
+            setStorageLocationFilter('internal');
+            if (activeSubFilter === 'sdcard_only') {
+              setActiveSubFilter('all');
+            }
+          }}
+          className={`flex-1 py-1.5 px-2 rounded-xl font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            storageLocationFilter === 'internal'
+              ? 'bg-white text-blue-700 shadow-2xs font-bold'
+              : 'text-neutral-600 hover:text-neutral-900'
+          }`}
+        >
+          <Smartphone size={13} className={storageLocationFilter === 'internal' ? 'text-blue-600' : 'text-neutral-400'} />
+          <span className="truncate">{language === 'hi' ? 'फ़ोन मेमोरी' : 'Phone'} ({internalFiles.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            triggerHapticFeedback();
+            setStorageLocationFilter('sdcard');
+            if (activeSubFilter === 'internal_only') {
+              setActiveSubFilter('all');
+            }
+          }}
+          className={`flex-1 py-1.5 px-2 rounded-xl font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            storageLocationFilter === 'sdcard'
+              ? 'bg-white text-purple-700 shadow-2xs font-bold'
+              : 'text-neutral-600 hover:text-neutral-900'
+          }`}
+        >
+          <HardDrive size={13} className={storageLocationFilter === 'sdcard' ? 'text-purple-600' : 'text-neutral-400'} />
+          <span className="truncate">{language === 'hi' ? 'SD कार्ड' : 'SD Card'} ({sdCardFiles.length})</span>
+        </button>
+      </div>
+
       {/* Sub-Category Filter Chips */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
         <button
-          onClick={() => setActiveSubFilter('all')}
+          onClick={() => {
+            setActiveSubFilter('all');
+          }}
           className={`px-3 py-1.5 rounded-full font-bold shrink-0 transition-colors cursor-pointer ${
             activeSubFilter === 'all'
               ? 'bg-neutral-900 text-white shadow-2xs'
               : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
           }`}
         >
-          All ({allCategoryFiles.length})
+          All ({categoryFiles.length})
         </button>
 
         {category === 'audio' && (
           <>
+            <button
+              onClick={() => {
+                setActiveSubFilter('sdcard_only');
+                setStorageLocationFilter('sdcard');
+              }}
+              className={`px-3 py-1.5 rounded-full font-bold shrink-0 transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeSubFilter === 'sdcard_only' || (storageLocationFilter === 'sdcard' && activeSubFilter === 'all')
+                  ? 'bg-purple-700 text-white shadow-xs'
+                  : 'bg-purple-50 border border-purple-200 text-purple-800 hover:bg-purple-100'
+              }`}
+            >
+              <HardDrive size={13} />
+              <span>💾 {language === 'hi' ? 'SD कार्ड ऑडियो' : 'SD Card Audio'} ({sdCardFiles.length})</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveSubFilter('internal_only');
+                setStorageLocationFilter('internal');
+              }}
+              className={`px-3 py-1.5 rounded-full font-semibold shrink-0 transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeSubFilter === 'internal_only'
+                  ? 'bg-blue-700 text-white shadow-xs'
+                  : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+              }`}
+            >
+              <Smartphone size={13} />
+              <span>📱 {language === 'hi' ? 'इंटरनल ऑडियो' : 'Internal Audio'} ({internalFiles.length})</span>
+            </button>
+
             <button
               onClick={() => setActiveSubFilter('songs')}
               className={`px-3 py-1.5 rounded-full font-semibold shrink-0 transition-colors cursor-pointer ${
@@ -572,6 +670,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
             >
               🎵 {language === 'hi' ? 'गाने व संगीत' : 'Songs & Music'}
             </button>
+
             <button
               onClick={() => setActiveSubFilter('recordings')}
               className={`px-3 py-1.5 rounded-full font-semibold shrink-0 transition-colors cursor-pointer ${
@@ -582,6 +681,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
             >
               🎙️ {language === 'hi' ? 'वॉयस रिकॉर्डिंग्स' : 'Voice Recordings'}
             </button>
+
             <button
               onClick={() => setActiveSubFilter('whatsapp')}
               className={`px-3 py-1.5 rounded-full font-semibold shrink-0 transition-colors cursor-pointer ${
@@ -592,6 +692,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
             >
               💬 WhatsApp Audio
             </button>
+
             <button
               onClick={() => setActiveSubFilter('starred')}
               className={`px-3 py-1.5 rounded-full font-semibold shrink-0 transition-colors cursor-pointer ${

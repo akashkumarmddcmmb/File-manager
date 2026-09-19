@@ -157,6 +157,33 @@ export const initialFiles: FileItem[] = [
     url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
     thumbnail: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=300&auto=format&fit=crop&q=60',
   },
+  {
+    id: 'aud-sd-5',
+    name: 'Lata_Mangeshkar_Golden_Melodies.mp3',
+    size: 9800000, // 9.8 MB
+    type: 'audio',
+    mimeType: 'audio/mpeg',
+    folder: '/Music/Oldies',
+    storageDevice: 'sdcard',
+    createdAt: '2026-07-08T15:20:00Z',
+    updatedAt: '2026-07-08T15:20:00Z',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3',
+    thumbnail: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&auto=format&fit=crop&q=60',
+    isStarred: true,
+  },
+  {
+    id: 'aud-sd-6',
+    name: 'Devotional_Morning_Bhajans.mp3',
+    size: 14200000, // 14.2 MB
+    type: 'audio',
+    mimeType: 'audio/mpeg',
+    folder: '/Audio/Bhakti',
+    storageDevice: 'sdcard',
+    createdAt: '2026-07-05T06:30:00Z',
+    updatedAt: '2026-07-05T06:30:00Z',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3',
+    thumbnail: 'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=300&auto=format&fit=crop&q=60',
+  },
 
   // ==========================================
   // 2. VIDEO CATEGORY (INTERNAL STORAGE & SD CARD)

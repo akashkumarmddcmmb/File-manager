@@ -32,6 +32,7 @@ import {
 import { FileItem, Language } from '../types';
 import { formatBytes } from '../utils/storage';
 import { openRealFile, shareNativeFile, triggerHapticFeedback } from '../utils/nativeStorage';
+import { AndroidMediaCard } from './AndroidMediaCard';
 
 interface AudioPlayerModalProps {
   isOpen: boolean;
@@ -94,7 +95,7 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
   onSetAsRingtone,
   onOpenLockScreen,
 }) => {
-  const [activeTab, setActiveTab] = useState<'player' | 'playlist' | 'details'>('player');
+  const [activeTab, setActiveTab] = useState<'player' | 'lockcard' | 'playlist' | 'details'>('player');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSpeedModalOpen, setIsSpeedModalOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -356,7 +357,7 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
               triggerHapticFeedback();
               setActiveTab('player');
             }}
-            className={`px-4 py-1 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'player' 
                 ? 'bg-white text-neutral-950 font-bold shadow-md' 
                 : 'text-neutral-200 hover:text-white'
@@ -369,9 +370,24 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
           <button
             onClick={() => {
               triggerHapticFeedback();
+              setActiveTab('lockcard');
+            }}
+            className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'lockcard' 
+                ? 'bg-white text-neutral-950 font-bold shadow-md' 
+                : 'text-neutral-200 hover:text-white'
+            }`}
+          >
+            <Lock size={13} />
+            <span>{language === 'hi' ? 'लॉक कार्ड' : 'Lock Card'}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              triggerHapticFeedback();
               setActiveTab('playlist');
             }}
-            className={`px-4 py-1 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'playlist' 
                 ? 'bg-white text-neutral-950 font-bold shadow-md' 
                 : 'text-neutral-200 hover:text-white'
@@ -387,7 +403,7 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
               triggerHapticFeedback();
               setActiveTab('details');
             }}
-            className={`px-4 py-1 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'details' 
                 ? 'bg-white text-neutral-950 font-bold shadow-md' 
                 : 'text-neutral-200 hover:text-white'
@@ -448,9 +464,12 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
               <h2 className="text-base sm:text-lg font-bold text-white leading-snug line-clamp-2" title={file.name}>
                 {file.name}
               </h2>
-              <p className="text-xs text-neutral-400 truncate">
-                {file.folder ? `${file.folder} • ` : ''}{formatBytes(file.size)}
-              </p>
+              <div className="flex items-center gap-2 text-xs text-neutral-400 truncate">
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${file.storageDevice === 'sdcard' ? 'bg-purple-900/70 text-purple-300 border border-purple-500/40' : 'bg-blue-900/70 text-blue-300 border border-blue-500/40'}`}>
+                  {file.storageDevice === 'sdcard' ? '💾 SD Card' : '📱 Phone'}
+                </span>
+                <span className="truncate">{file.folder ? `${file.folder} • ` : ''}{formatBytes(file.size)}</span>
+              </div>
             </div>
           </div>
         )}
@@ -491,15 +510,61 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-semibold truncate">{track.name}</p>
-                        <p className="text-[10px] text-neutral-400 truncate mt-0.5">
-                          {formatBytes(track.size)}
-                        </p>
+                        <div className="flex items-center gap-1.5 text-[10px] text-neutral-400 truncate mt-0.5">
+                          <span className={`px-1 py-0.2 rounded text-[9px] font-bold ${track.storageDevice === 'sdcard' ? 'bg-purple-900/60 text-purple-300' : 'bg-blue-900/60 text-blue-300'}`}>
+                            {track.storageDevice === 'sdcard' ? 'SD' : 'Int'}
+                          </span>
+                          <span>{formatBytes(track.size)}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* TAB 2: LOCK SCREEN MEDIA CARD WIDGET (Exact match to screenshot!) */}
+        {activeTab === 'lockcard' && (
+          <div className="w-full max-w-sm flex flex-col items-center justify-center py-4 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="text-center space-y-1">
+              <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                {language === 'hi' ? 'Android 14 लॉक स्क्रीन प्लेयर' : 'Android 14 Lock Screen Player'}
+              </span>
+              <p className="text-xs text-neutral-400 mt-1">
+                {language === 'hi' ? 'यह वही प्लेयर है जो स्क्रीन लॉक होने पर दिखता है' : 'This is the exact widget shown on lock screen'}
+              </p>
+            </div>
+
+            {/* The exact Android Media Card */}
+            <AndroidMediaCard
+              file={file}
+              isPlaying={isPlaying}
+              currentTime={currentTime}
+              duration={duration}
+              language={language}
+              onPlayPause={onPlayPause}
+              onSeek={onSeek}
+              onNext={onNext}
+              onPrev={onPrev}
+              onOpenOutputSheet={onOpenLockScreen}
+            />
+
+            {/* Button to open full lock screen view */}
+            {onOpenLockScreen && (
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHapticFeedback();
+                  onOpenLockScreen();
+                }}
+                className="w-full py-2.5 px-4 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-98 text-xs font-semibold text-white flex items-center justify-center gap-2 transition-all cursor-pointer border border-white/10"
+              >
+                <Lock size={15} className="text-emerald-400" />
+                <span>{language === 'hi' ? 'फुल स्क्रीन लॉक मोड खोलें' : 'Open Full Screen Lock Mode'}</span>
+              </button>
+            )}
           </div>
         )}
 
@@ -536,7 +601,8 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
       </div>
 
       {/* 3. BOTTOM CONTROLLER (Progress Bar + Play/Pause Controls) */}
-      <div className="w-full p-4 pb-safe bg-[#283427] border-t border-white/10 space-y-3 shrink-0">
+      {activeTab !== 'lockcard' && (
+        <div className="w-full p-4 pb-safe bg-[#283427] border-t border-white/10 space-y-3 shrink-0">
         <div className="max-w-md mx-auto w-full space-y-3">
           {/* Progress Timeline Scrubber */}
           <div className="space-y-1">
@@ -666,6 +732,7 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
           </div>
         </div>
       </div>
+      )}
 
       {/* PLAYBACK SPEED SELECTION MODAL */}
       {isSpeedModalOpen && (

@@ -17,7 +17,8 @@ import {
   Volume2,
   FolderOpen,
   Layers,
-  Inbox
+  Inbox,
+  Lock
 } from 'lucide-react';
 import { AppNotification, Language } from '../types';
 import { translations } from '../utils/translations';
@@ -35,6 +36,7 @@ interface NotificationShadeProps {
   onPlayPauseAudio?: () => void;
   onNextTrack?: () => void;
   onPrevTrack?: () => void;
+  onOpenLockScreen?: () => void;
   language: Language;
 }
 
@@ -50,6 +52,7 @@ export const NotificationShade: React.FC<NotificationShadeProps> = ({
   onPlayPauseAudio,
   onNextTrack,
   onPrevTrack,
+  onOpenLockScreen,
   language,
 }) => {
   if (!isOpen) return null;
@@ -258,6 +261,19 @@ export const NotificationShade: React.FC<NotificationShadeProps> = ({
                           className="p-1.5 text-neutral-600 hover:text-neutral-900 rounded-full hover:bg-neutral-200 transition-colors cursor-pointer"
                         >
                           <SkipForward size={16} />
+                        </button>
+                      )}
+                      {onOpenLockScreen && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onClose();
+                            onOpenLockScreen();
+                          }}
+                          className="p-1.5 text-purple-600 hover:text-purple-800 rounded-full hover:bg-purple-100 transition-colors cursor-pointer"
+                          title={language === 'hi' ? 'स्क्रीन लॉक प्लेयर' : 'Lock Screen Player'}
+                        >
+                          <Lock size={15} />
                         </button>
                       )}
                     </div>
