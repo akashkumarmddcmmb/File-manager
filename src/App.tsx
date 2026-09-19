@@ -64,6 +64,11 @@ import {
   triggerHapticFeedback
 } from './utils/nativeStorage';
 import { saveFileBlob } from './utils/idbStorage';
+import { 
+  initNotificationChannels, 
+  requestNativeNotificationPermission, 
+  postNativeSystemNotification 
+} from './utils/nativeNotifications';
 
 const STORAGE_FILES_KEY = 'google_files_app_files_v1';
 const STORAGE_FOLDERS_KEY = 'google_files_app_folders_v1';
@@ -216,6 +221,8 @@ export default function App() {
   // Check and read real device storage when running natively on Android
   useEffect(() => {
     loadRealDeviceStorage();
+    initNotificationChannels();
+    requestNativeNotificationPermission().catch(e => console.warn(e));
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
@@ -313,6 +320,14 @@ export default function App() {
       }
       return [notif, ...prev];
     });
+
+    // Also dispatch to Android Native Status Bar / Notification shade
+    postNativeSystemNotification({
+      title: notif.title,
+      body: notif.description,
+      channelId: notif.type === 'media-playback' ? 'files_media' : notif.type === 'file-operation' || notif.type === 'transfer' ? 'files_transfers' : 'files_general',
+      extra: { notifId: notif.id, type: notif.type }
+    }).catch(e => console.warn(e));
   };
 
   const dismissNotification = (id: string) => {
@@ -1566,6 +1581,7 @@ export default function App() {
             onExtractArchive={handleExtractArchive}
             onCompressZip={handleCompressFiles}
             onRegisterSelectionClearer={(clearer) => { selectionClearerRef.current = clearer; }}
+            onRefreshStorage={loadRealDeviceStorage}
           />
         ) : (
           /* Primary Tabs: Clean, Browse, Share */
@@ -1817,6 +1833,9 @@ export default function App() {
       {/* Hidden Global Audio Element for Background Music Playback */}
       <audio
         ref={audioElementRef}
+        onError={() => {
+          setIsAudioPlaying(false);
+        }}
         onTimeUpdate={() => {
           if (audioElementRef.current) {
             setAudioCurrentTime(audioElementRef.current.currentTime);

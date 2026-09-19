@@ -10,13 +10,13 @@ import {
   Minimize, 
   Volume2, 
   VolumeX, 
-  Settings, 
   ExternalLink, 
   Share2, 
   Film,
-  Sparkles,
   PictureInPicture2,
-  Ratio
+  Ratio,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { FileItem, Language } from '../types';
 import { formatBytes } from '../utils/storage';
@@ -47,7 +47,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -124,13 +124,12 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
   const toggleFullscreen = () => {
     triggerHapticFeedback();
-    if (!containerRef.current) return;
     if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen?.().catch(() => {});
-      setIsFullscreen(true);
+      document.documentElement.requestFullscreen?.().catch(() => {});
+      setIsBrowserFullscreen(true);
     } else {
       document.exitFullscreen?.().catch(() => {});
-      setIsFullscreen(false);
+      setIsBrowserFullscreen(false);
     }
   };
 
@@ -163,24 +162,111 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in duration-200 select-none"
-      onClick={() => resetControlsTimeout()}
+      ref={containerRef}
+      className="fixed inset-0 z-50 w-full h-full bg-black text-white flex flex-col justify-between select-none overflow-hidden animate-in fade-in duration-200"
+      onClick={resetControlsTimeout}
+      onMouseMove={resetControlsTimeout}
+      onTouchStart={resetControlsTimeout}
     >
+      {/* 1. TOP APP BAR OVERLAY */}
       <div 
-        ref={containerRef}
-        className="relative w-full h-full sm:max-w-4xl sm:max-h-[88vh] bg-black sm:rounded-3xl overflow-hidden flex flex-col justify-center border border-neutral-800 shadow-2xl"
+        className={`w-full z-30 transition-all duration-300 bg-gradient-to-b from-black/90 via-black/60 to-transparent px-4 py-3 pt-safe flex items-center justify-between gap-3 ${
+          showControls ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
+        }`}
         onClick={(e) => e.stopPropagation()}
-        onMouseMove={resetControlsTimeout}
-        onTouchStart={resetControlsTimeout}
       >
-        {/* Video Element */}
+        <div className="flex items-center gap-3 min-w-0 pr-2">
+          <button
+            onClick={() => {
+              triggerHapticFeedback();
+              onClose();
+            }}
+            className="p-2.5 text-neutral-300 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer shrink-0"
+            title="Close"
+          >
+            <X size={22} />
+          </button>
+          <div className="min-w-0">
+            <h3 className="text-sm sm:text-base font-bold truncate text-white leading-tight" title={file.name}>
+              {file.name}
+            </h3>
+            <p className="text-[11px] text-neutral-400 truncate">
+              {formatBytes(file.size)} • {file.folder}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Aspect Ratio Fit */}
+          <button
+            onClick={() => {
+              triggerHapticFeedback();
+              setFitMode(prev => prev === 'contain' ? 'cover' : 'contain');
+            }}
+            className="p-2 text-neutral-300 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+            title={fitMode === 'contain' ? 'Fit Screen' : 'Fill Screen'}
+          >
+            <Ratio size={19} />
+          </button>
+
+          {/* PiP */}
+          <button
+            onClick={togglePictureInPicture}
+            className="p-2 text-neutral-300 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+            title="Picture in Picture"
+          >
+            <PictureInPicture2 size={19} />
+          </button>
+
+          {/* Open in phone video player */}
+          {file.url && (
+            <button
+              onClick={() => {
+                triggerHapticFeedback();
+                openRealFile(file.url!);
+              }}
+              className="p-2 text-rose-400 hover:text-rose-300 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+              title={language === 'hi' ? 'फ़ोन वीडियो प्लेयर में चलाएं' : 'Open in Phone Video Player'}
+            >
+              <ExternalLink size={19} />
+            </button>
+          )}
+
+          {/* Full Screen Toggle */}
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 text-neutral-300 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+            title={isBrowserFullscreen ? 'Exit Full Screen' : 'Full Screen'}
+          >
+            {isBrowserFullscreen ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
+          </button>
+
+          {/* Share */}
+          <button
+            onClick={() => {
+              triggerHapticFeedback();
+              if (file.url) shareNativeFile(file.name, `Video: ${file.name}`, file.url);
+            }}
+            className="p-2 text-neutral-300 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+            title="Share"
+          >
+            <Share2 size={19} />
+          </button>
+        </div>
+      </div>
+
+      {/* 2. FULL SCREEN VIDEO CANVAS */}
+      <div 
+        className="relative flex-1 w-full h-full flex items-center justify-center bg-black overflow-hidden"
+        onClick={handlePlayPause}
+      >
         <video
           ref={videoRef}
           src={resolvedSrc}
           autoPlay
           playsInline
           muted={isMuted}
-          className={`w-full h-full ${fitMode === 'cover' ? 'object-cover' : 'object-contain'} bg-black`}
+          className={`w-full h-full ${fitMode === 'cover' ? 'object-cover' : 'object-contain'} bg-black select-none`}
           onTimeUpdate={() => {
             if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
           }}
@@ -188,213 +274,136 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             if (videoRef.current) setDuration(videoRef.current.duration);
           }}
           onEnded={() => setIsPlaying(false)}
-          onClick={handlePlayPause}
         />
 
-        {/* Top Control Bar (Overlay) */}
-        <div 
-          className={`absolute top-0 inset-x-0 bg-gradient-to-b from-black/85 via-black/40 to-transparent p-4 flex items-center justify-between text-white transition-opacity duration-300 z-20 ${
-            showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
-          }`}
-        >
-          <div className="flex items-center gap-3 min-w-0 pr-2">
-            <button
-              onClick={() => {
-                triggerHapticFeedback();
-                onClose();
-              }}
-              className="p-2 text-neutral-300 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
-              title="Close"
-            >
-              <X size={22} />
-            </button>
-            <div className="min-w-0">
-              <h3 className="text-sm font-semibold truncate" title={file.name}>
-                {file.name}
-              </h3>
-              <p className="text-[11px] text-neutral-400 truncate">
-                {formatBytes(file.size)} • {file.folder}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Aspect Ratio Fit */}
-            <button
-              onClick={() => {
-                triggerHapticFeedback();
-                setFitMode(prev => prev === 'contain' ? 'cover' : 'contain');
-              }}
-              className="p-2 text-neutral-300 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
-              title={fitMode === 'contain' ? 'Fit Screen' : 'Fill Screen'}
-            >
-              <Ratio size={18} />
-            </button>
-
-            {/* PiP */}
-            <button
-              onClick={togglePictureInPicture}
-              className="p-2 text-neutral-300 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
-              title="Picture in Picture"
-            >
-              <PictureInPicture2 size={18} />
-            </button>
-
-            {/* Open in phone video player */}
-            {file.url && (
-              <button
-                onClick={() => {
-                  triggerHapticFeedback();
-                  openRealFile(file.url!);
-                }}
-                className="p-2 text-rose-400 hover:text-rose-300 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
-                title={language === 'hi' ? 'फ़ोन वीडियो प्लेयर में चलाएं' : 'Open in Phone Video Player'}
-              >
-                <ExternalLink size={18} />
-              </button>
-            )}
-
-            {/* Share */}
-            <button
-              onClick={() => {
-                triggerHapticFeedback();
-                if (file.url) shareNativeFile(file.name, `Video: ${file.name}`, file.url);
-              }}
-              className="p-2 text-neutral-300 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
-              title="Share"
-            >
-              <Share2 size={18} />
-            </button>
-          </div>
-        </div>
-
-        {/* Center Quick Skip & Play Indicators (Overlay) */}
+        {/* Center Quick Skip & Play Indicators */}
         <div 
           className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-300 z-10 ${
             showControls ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          <div className="flex items-center gap-8 sm:gap-14 pointer-events-auto">
+          <div className="flex items-center gap-8 sm:gap-16 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => handleSkip(-10)}
-              className="p-3 sm:p-4 rounded-full bg-black/50 hover:bg-black/70 active:scale-95 text-white transition-all backdrop-blur-xs cursor-pointer"
+              className="p-3.5 sm:p-4 rounded-full bg-black/60 hover:bg-black/80 active:scale-95 text-white transition-all backdrop-blur-md cursor-pointer border border-white/10 shadow-xl"
               title="-10 seconds"
             >
-              <RotateCcw size={26} />
+              <RotateCcw size={28} />
             </button>
 
             <button
               onClick={handlePlayPause}
-              className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-rose-600 hover:bg-rose-500 active:scale-95 text-white flex items-center justify-center shadow-xl shadow-rose-600/30 transition-all cursor-pointer"
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-rose-600 hover:bg-rose-500 active:scale-95 text-white flex items-center justify-center shadow-2xl shadow-rose-600/40 transition-all cursor-pointer"
               title={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
-                <Pause size={32} className="fill-white" />
+                <Pause size={34} className="fill-white" />
               ) : (
-                <Play size={32} className="fill-white ml-1" />
+                <Play size={34} className="fill-white ml-1" />
               )}
             </button>
 
             <button
               onClick={() => handleSkip(10)}
-              className="p-3 sm:p-4 rounded-full bg-black/50 hover:bg-black/70 active:scale-95 text-white transition-all backdrop-blur-xs cursor-pointer"
+              className="p-3.5 sm:p-4 rounded-full bg-black/60 hover:bg-black/80 active:scale-95 text-white transition-all backdrop-blur-md cursor-pointer border border-white/10 shadow-xl"
               title="+10 seconds"
             >
-              <RotateCw size={26} />
+              <RotateCw size={28} />
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Bottom Control Bar (Overlay) */}
-        <div 
-          className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 sm:p-5 space-y-2.5 transition-opacity duration-300 z-20 ${
-            showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
-          }`}
-        >
-          {/* Progress Slider */}
-          <div className="space-y-1">
-            <div className="relative group">
-              <input
-                type="range"
-                min={0}
-                max={duration || 100}
-                value={currentTime || 0}
-                onChange={(e) => handleSeek(Number(e.target.value))}
-                className="w-full h-1.5 bg-neutral-700/80 rounded-lg appearance-none cursor-pointer accent-rose-500 focus:outline-hidden"
-              />
-              <div 
-                className="absolute top-0 left-0 h-1.5 bg-rose-500 rounded-lg pointer-events-none"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-[11px] text-neutral-300 font-mono">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
-            </div>
+      {/* 3. BOTTOM CONTROL BAR OVERLAY */}
+      <div 
+        className={`w-full z-30 transition-all duration-300 bg-gradient-to-t from-black/95 via-black/60 to-transparent px-4 py-4 pb-safe space-y-2.5 ${
+          showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Progress Slider */}
+        <div className="space-y-1">
+          <div className="relative group">
+            <input
+              type="range"
+              min={0}
+              max={duration || 100}
+              value={currentTime || 0}
+              onChange={(e) => handleSeek(Number(e.target.value))}
+              className="w-full h-2 bg-neutral-700/80 rounded-lg appearance-none cursor-pointer accent-rose-500 focus:outline-hidden"
+            />
+            <div 
+              className="absolute top-0 left-0 h-2 bg-rose-500 rounded-lg pointer-events-none"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-xs text-neutral-300 font-mono font-medium">
+            <span>{formatTime(currentTime)}</span>
+            <span>{formatTime(duration)}</span>
+          </div>
+        </div>
+
+        {/* Bottom Control Strip */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handlePlayPause}
+              className="text-white hover:text-rose-400 p-1.5 cursor-pointer"
+            >
+              {isPlaying ? <Pause size={22} /> : <Play size={22} />}
+            </button>
+
+            <button
+              onClick={() => {
+                triggerHapticFeedback();
+                setIsMuted(!isMuted);
+              }}
+              className="text-neutral-300 hover:text-white p-1.5 cursor-pointer"
+              title={isMuted ? 'Unmute' : 'Mute'}
+            >
+              {isMuted ? <VolumeX size={22} /> : <Volume2 size={22} />}
+            </button>
+
+            <span className="text-xs text-neutral-300 font-mono hidden sm:inline">
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
           </div>
 
-          {/* Bottom Control Strip */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 relative">
+            {/* Playback speed selector */}
+            <div className="relative">
               <button
-                onClick={handlePlayPause}
-                className="text-white hover:text-rose-400 p-1 cursor-pointer"
+                onClick={() => setShowSpeedMenu(!showSpeedMenu)}
+                className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition-colors cursor-pointer border border-white/10"
               >
-                {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+                {playbackRate}x
               </button>
 
-              <button
-                onClick={() => {
-                  triggerHapticFeedback();
-                  setIsMuted(!isMuted);
-                }}
-                className="text-neutral-300 hover:text-white p-1 cursor-pointer"
-                title={isMuted ? 'Unmute' : 'Mute'}
-              >
-                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-              </button>
-
-              <span className="text-xs text-neutral-300 font-mono hidden sm:inline">
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </span>
+              {showSpeedMenu && (
+                <div className="absolute bottom-full right-0 mb-2 bg-neutral-900 border border-neutral-800 rounded-2xl p-1.5 shadow-2xl flex flex-col gap-1 z-30 min-w-[80px]">
+                  {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
+                    <button
+                      key={rate}
+                      onClick={() => handleSpeedChange(rate)}
+                      className={`px-3 py-1.5 text-xs rounded-xl text-left transition-colors cursor-pointer ${
+                        playbackRate === rate ? 'bg-rose-600 text-white font-bold' : 'text-neutral-300 hover:bg-neutral-800'
+                      }`}
+                    >
+                      {rate}x
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center gap-2 relative">
-              {/* Playback speed selector */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowSpeedMenu(!showSpeedMenu)}
-                  className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition-colors cursor-pointer"
-                >
-                  {playbackRate}x
-                </button>
-
-                {showSpeedMenu && (
-                  <div className="absolute bottom-full right-0 mb-2 bg-neutral-900 border border-neutral-800 rounded-xl p-1 shadow-2xl flex flex-col gap-0.5 z-30 min-w-[72px]">
-                    {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
-                      <button
-                        key={rate}
-                        onClick={() => handleSpeedChange(rate)}
-                        className={`px-3 py-1.5 text-xs rounded-lg text-left transition-colors ${
-                          playbackRate === rate ? 'bg-rose-600 text-white font-bold' : 'text-neutral-300 hover:bg-neutral-800'
-                        }`}
-                      >
-                        {rate}x
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Fullscreen Button */}
-              <button
-                onClick={toggleFullscreen}
-                className="p-1.5 text-neutral-300 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
-                title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-              >
-                {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
-              </button>
-            </div>
+            {/* Fullscreen Button */}
+            <button
+              onClick={toggleFullscreen}
+              className="p-2 text-neutral-300 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+              title={isBrowserFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+            >
+              {isBrowserFullscreen ? <Minimize size={22} /> : <Maximize size={22} />}
+            </button>
           </div>
         </div>
       </div>

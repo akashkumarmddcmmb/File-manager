@@ -155,8 +155,14 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
                 <Star size={12} className="fill-amber-400 text-amber-400 shrink-0" />
               )}
             </div>
-            <div className="text-[11px] text-neutral-400 truncate">
-              {formatBytes(file.size)} • {formatDate(file.createdAt)} • {file.folder}
+            <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 truncate mt-0.5">
+              <span className="font-medium text-neutral-700">{formatBytes(file.size)}</span>
+              <span>•</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${file.storageDevice === 'sdcard' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                {file.storageDevice === 'sdcard' ? 'SD Card' : 'Internal'}
+              </span>
+              <span>•</span>
+              <span className="text-neutral-400 truncate">{file.folder}</span>
             </div>
           </div>
         </div>
@@ -361,9 +367,13 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
           <p className="text-[11px] sm:text-xs font-medium text-neutral-900 truncate" title={file.name}>
             {file.name}
           </p>
-          <p className="text-[10px] text-neutral-400 pt-0.5">
-            {formatBytes(file.size)}
-          </p>
+          <div className="flex items-center gap-1 text-[10px] text-neutral-500 pt-0.5">
+            <span className="font-medium text-neutral-600">{formatBytes(file.size)}</span>
+            <span>•</span>
+            <span className={`px-1 py-0.2 rounded text-[9px] font-bold ${file.storageDevice === 'sdcard' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+              {file.storageDevice === 'sdcard' ? 'SD' : 'Int'}
+            </span>
+          </div>
         </div>
 
         {/* Context Menu Button */}

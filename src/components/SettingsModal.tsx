@@ -21,13 +21,19 @@ import {
   RotateCcw,
   SunMoon,
   Volume2,
-  MessageSquare
+  MessageSquare,
+  Bell
 } from 'lucide-react';
 import { Language, StorageBreakdown } from '../types';
 import { translations } from '../utils/translations';
 import { formatBytes } from '../utils/storage';
 import { saveVaultPin, verifyVaultPin } from '../utils/cryptoVault';
 import { APP_INFO } from '../constants/appInfo';
+import { 
+  requestNativeNotificationPermission, 
+  checkNativeNotificationPermission, 
+  postNativeSystemNotification 
+} from '../utils/nativeNotifications';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -88,6 +94,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [themePreference, setThemePreference] = useState(() => {
     return localStorage.getItem('akash_files_theme') || 'system';
   });
+
+  const [nativeNotifGranted, setNativeNotifGranted] = useState(false);
+
+  React.useEffect(() => {
+    checkNativeNotificationPermission().then(granted => {
+      setNativeNotifGranted(granted);
+    });
+  }, [isOpen]);
+
+  const handleRequestNativeNotif = async () => {
+    const granted = await requestNativeNotificationPermission();
+    setNativeNotifGranted(granted);
+    if (granted) {
+      showToast(language === 'hi' ? 'सिस्टम नोटिफ़िकेशन अनुमति प्राप्त हुई ✅' : 'System Notification Permission Allowed ✅');
+      postNativeSystemNotification({
+        title: 'Files by Akash Kumar',
+        body: language === 'hi' ? 'सिस्टम स्टेटस बार नोटिफ़िकेशन सक्रिय है!' : 'System status bar notifications are active!',
+        channelId: 'files_general',
+      });
+    } else {
+      showToast(language === 'hi' ? 'कृपया Android सेटिंग में "Allow Notifications" चालू करें' : 'Please enable "Allow Notifications" in Android Settings');
+    }
+  };
+
+  const handleTestNativeNotif = async () => {
+    await postNativeSystemNotification({
+      title: language === 'hi' ? 'फ़ाइल कार्य व स्थानांतरण सक्रिय' : 'File Activity Active',
+      body: language === 'hi' ? 'स्टेटस बार को नीचे स्लाइड करके यह सूचना देखें।' : 'Pull down your status bar to view this notification.',
+      channelId: 'files_transfers',
+    });
+    showToast(language === 'hi' ? 'स्टेटस बार में टेस्ट नोटिफ़िकेशन भेजा गया! ऊपर से नीचे स्लाइड करें।' : 'Test notification sent to status bar! Pull down from top.');
+  };
 
   // PIN Change State
   const [isChangingPin, setIsChangingPin] = useState(false);
@@ -548,6 +586,59 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               >
                 <span className="w-4 h-4 rounded-full bg-white shadow-xs" />
               </button>
+            </div>
+          </div>
+
+          {/* 6. ANDROID SYSTEM NOTIFICATIONS (STATUS BAR) */}
+          <div className="bg-white rounded-2xl p-4 border border-neutral-200/80 shadow-xs space-y-3.5">
+            <div className="flex items-center gap-2 text-xs font-bold text-neutral-500 uppercase tracking-wider">
+              <Bell size={14} className="text-blue-600" />
+              <span>{language === 'hi' ? 'Android स्टेटस बार नोटिफ़िकेशन' : 'Android Status Bar Notifications'}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-1">
+              <div className="flex items-center gap-3 pr-2">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                  nativeNotifGranted ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
+                }`}>
+                  <Bell size={17} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs sm:text-sm font-semibold text-neutral-800">
+                      {language === 'hi' ? 'सिस्टम सूचनाएं (Allow Notifications)' : 'Allow Notifications'}
+                    </span>
+                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md ${
+                      nativeNotifGranted ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      {nativeNotifGranted ? (language === 'hi' ? 'चालू / ON' : 'ALLOWED') : (language === 'hi' ? 'अनुमति दें' : 'PERMISSION NEEDED')}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-neutral-500 leading-tight mt-0.5">
+                    {language === 'hi'
+                      ? 'फ़ाइल कॉपी, ट्रांसफर और बैकग्राउंड कार्य फोन के स्टेटस बार (Notification Shade) में दिखेंगे।'
+                      : 'File transfers, background tasks and alerts will appear in Android Status Bar.'}
+                  </div>
+                </div>
+              </div>
+
+              {!nativeNotifGranted ? (
+                <button
+                  type="button"
+                  onClick={handleRequestNativeNotif}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer shadow-xs shrink-0"
+                >
+                  {language === 'hi' ? 'चालू करें' : 'Enable'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleTestNativeNotif}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors cursor-pointer shrink-0 border border-blue-200/80"
+                >
+                  {language === 'hi' ? 'टेस्ट करें' : 'Test Bar'}
+                </button>
+              )}
             </div>
           </div>
 

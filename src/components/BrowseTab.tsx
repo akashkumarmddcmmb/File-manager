@@ -104,6 +104,13 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
   const sdCardFreeBytes = realVolumes?.sdcard ? realVolumes.sdcard.freeBytes : (sdCardTotalBytes - sdCardUsedBytes);
   const sdCardLabel = realVolumes?.sdcard ? realVolumes.sdcard.name : 'SanDisk 128 GB';
 
+  // Helper to get breakdown
+  const getCatBreakdown = (catList: FileItem[]) => {
+    const internalCount = catList.filter(f => f.storageDevice !== 'sdcard').length;
+    const sdCount = catList.filter(f => f.storageDevice === 'sdcard').length;
+    return { internalCount, sdCount };
+  };
+
   // Official Google Files Category Icons & Pastel Circles
   const categories = [
     {
@@ -113,6 +120,7 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
       iconBg: 'bg-[#e8f0fe]',
       count: downloadsFiles.length,
       size: downloadsFiles.reduce((acc, f) => acc + f.size, 0),
+      ...getCatBreakdown(downloadsFiles),
     },
     {
       id: 'images' as FileCategory,
@@ -121,6 +129,7 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
       iconBg: 'bg-[#e0f2f1]',
       count: imagesFiles.length,
       size: imagesFiles.reduce((acc, f) => acc + f.size, 0),
+      ...getCatBreakdown(imagesFiles),
     },
     {
       id: 'videos' as FileCategory,
@@ -129,6 +138,7 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
       iconBg: 'bg-[#fce8e6]',
       count: videosFiles.length,
       size: videosFiles.reduce((acc, f) => acc + f.size, 0),
+      ...getCatBreakdown(videosFiles),
     },
     {
       id: 'audio' as FileCategory,
@@ -137,6 +147,7 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
       iconBg: 'bg-[#fef7e0]',
       count: audioFiles.length,
       size: audioFiles.reduce((acc, f) => acc + f.size, 0),
+      ...getCatBreakdown(audioFiles),
     },
     {
       id: 'documents' as FileCategory,
@@ -145,6 +156,7 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
       iconBg: 'bg-[#e8eaf6]',
       count: docsFiles.length,
       size: docsFiles.reduce((acc, f) => acc + f.size, 0),
+      ...getCatBreakdown(docsFiles),
     },
     {
       id: 'apps' as FileCategory,
@@ -153,6 +165,7 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
       iconBg: 'bg-[#e6f4ea]',
       count: appsFiles.length,
       size: appsFiles.reduce((acc, f) => acc + f.size, 0),
+      ...getCatBreakdown(appsFiles),
     },
   ];
 
@@ -257,13 +270,24 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
                 <div className={`w-11 h-11 rounded-full ${cat.iconBg} flex items-center justify-center shrink-0`}>
                   {cat.icon}
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <h3 className="text-sm font-semibold text-neutral-900 truncate">
                     {cat.name}
                   </h3>
                   <p className="text-[11px] text-neutral-500 truncate mt-0.5">
                     {cat.count} {t.items} • {formatBytes(cat.size)}
                   </p>
+                  <div className="flex items-center gap-1.5 mt-1 text-[10px]">
+                    {cat.sdCount > 0 ? (
+                      <span className="px-1.5 py-0.2 rounded font-semibold bg-purple-50 text-purple-700 border border-purple-100">
+                        📱 {cat.internalCount} Int + 💾 {cat.sdCount} SD
+                      </span>
+                    ) : (
+                      <span className="text-neutral-400">
+                        📱 {cat.internalCount} Internal
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <ChevronRight size={18} className="text-neutral-400 group-hover:text-neutral-800 group-hover:translate-x-0.5 transition-all shrink-0" />

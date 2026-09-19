@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Capacitor } from '@capacitor/core';
+import React, { useState } from 'react';
 import { 
   X, 
   Play, 
@@ -11,10 +10,9 @@ import {
   Shuffle, 
   Repeat, 
   Repeat1, 
-  Volume2, 
-  VolumeX, 
   Minimize2, 
-  Star, 
+  Maximize2,
+  ChevronDown,
   Share2, 
   Music, 
   ListMusic, 
@@ -67,12 +65,9 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
   onToggleShuffle,
   onToggleRepeat,
   onSelectTrack,
-  onToggleStar,
 }) => {
-  const [showPlaylist, setShowPlaylist] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
-  const [volume, setVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(false);
+  const [activeTab, setActiveTab] = useState<'player' | 'playlist' | 'details'>('player');
+  const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false);
 
   if (!isOpen || !file) return null;
 
@@ -85,68 +80,188 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  const toggleBrowserFullscreen = () => {
+    triggerHapticFeedback();
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+      setIsBrowserFullscreen(true);
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+      setIsBrowserFullscreen(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div 
-        className="bg-gradient-to-b from-neutral-900 via-neutral-950 to-neutral-900 text-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col border border-neutral-800/80 max-h-[94vh]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Top Header Bar */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800/80 bg-neutral-900/60 backdrop-blur-xs">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                triggerHapticFeedback();
-                onMinimize();
-              }}
-              className="p-2 -ml-2 text-neutral-400 hover:text-white hover:bg-neutral-800/80 rounded-full transition-colors cursor-pointer"
-              title={language === 'hi' ? 'छोटा करें' : 'Minimize Player'}
-            >
-              <Minimize2 size={20} />
-            </button>
-            <div className="min-w-0">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1">
-                <Sparkles size={11} />
-                {language === 'hi' ? 'म्यूज़िक प्लेयर' : 'Music Player'}
-              </span>
-              <p className="text-xs text-neutral-400 truncate max-w-[200px] sm:max-w-xs">
-                {file.folder}
-              </p>
-            </div>
+    <div 
+      className="fixed inset-0 z-50 w-full h-full bg-gradient-to-b from-[#18191c] via-[#0d0e11] to-[#08090a] text-white flex flex-col justify-between select-none overflow-hidden animate-in fade-in duration-200"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* 1. TOP HEADER & NAVIGATION */}
+      <div className="w-full px-4 py-3 pt-safe border-b border-white/5 bg-white/[0.02] backdrop-blur-md shrink-0 flex flex-col gap-2.5">
+        {/* Top Control Strip */}
+        <div className="flex items-center justify-between gap-2">
+          {/* Minimize / Collapse down */}
+          <button
+            onClick={() => {
+              triggerHapticFeedback();
+              onMinimize();
+            }}
+            className="p-2 -ml-1 text-neutral-300 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer shrink-0"
+            title={language === 'hi' ? 'छोटा करें' : 'Minimize to Mini Player'}
+          >
+            <ChevronDown size={26} />
+          </button>
+
+          {/* Center Title */}
+          <div className="flex-1 text-center min-w-0 px-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 block truncate">
+              {language === 'hi' ? 'अभी बज रहा है' : 'Now Playing'}
+            </span>
+            <p className="text-xs text-neutral-400 truncate max-w-[240px] mx-auto mt-0.5">
+              {file.folder}
+            </p>
           </div>
 
-          <div className="flex items-center gap-1">
+          {/* Right Header Actions */}
+          <div className="flex items-center gap-1 shrink-0 -mr-1">
             <button
-              onClick={() => setShowPlaylist(!showPlaylist)}
-              className={`p-2 rounded-full transition-colors ${
-                showPlaylist ? 'bg-amber-500/20 text-amber-400' : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
-              }`}
-              title={language === 'hi' ? 'प्लेलिस्ट' : 'Playlist'}
+              onClick={toggleBrowserFullscreen}
+              className="p-2 text-neutral-400 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+              title={isBrowserFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
             >
-              <ListMusic size={20} />
+              {isBrowserFullscreen ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
             </button>
+
             <button
               onClick={() => {
                 triggerHapticFeedback();
                 onClose();
               }}
-              className="p-2 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-full transition-colors cursor-pointer"
+              className="p-2 text-neutral-400 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
               title="Close"
             >
-              <X size={20} />
+              <X size={22} />
             </button>
           </div>
         </div>
 
-        {/* Content Body: Either Player Visualizer or Playlist */}
-        <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center justify-center">
-          {showPlaylist ? (
-            /* Playlist View */
-            <div className="w-full space-y-2 max-h-[380px] overflow-y-auto pr-1">
-              <div className="flex items-center justify-between pb-2 border-b border-neutral-800 text-xs text-neutral-400 font-medium">
-                <span>{language === 'hi' ? 'सभी गाने' : 'Playlist Tracks'} ({playlist.length})</span>
-                <span className="text-[11px] text-amber-400">{isShuffle ? 'Shuffle On' : ''}</span>
+        {/* Clean Segmented Tab Switcher */}
+        <div className="flex items-center justify-center">
+          <div className="inline-flex items-center bg-white/10 p-1 rounded-2xl border border-white/10 shadow-inner">
+            <button
+              onClick={() => {
+                triggerHapticFeedback();
+                setActiveTab('player');
+              }}
+              className={`px-3.5 py-1 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'player' 
+                  ? 'bg-amber-500 text-neutral-950 font-bold shadow-md' 
+                  : 'text-neutral-300 hover:text-white'
+              }`}
+            >
+              <Music size={13} />
+              <span>{language === 'hi' ? 'प्लेयर' : 'Player'}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                triggerHapticFeedback();
+                setActiveTab('playlist');
+              }}
+              className={`px-3.5 py-1 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'playlist' 
+                  ? 'bg-amber-500 text-neutral-950 font-bold shadow-md' 
+                  : 'text-neutral-300 hover:text-white'
+              }`}
+            >
+              <ListMusic size={13} />
+              <span>{language === 'hi' ? 'प्लेलिस्ट' : 'Playlist'}</span>
+              <span className="text-[10px] opacity-80">({playlist.length})</span>
+            </button>
+
+            <button
+              onClick={() => {
+                triggerHapticFeedback();
+                setActiveTab('details');
+              }}
+              className={`px-3.5 py-1 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'details' 
+                  ? 'bg-amber-500 text-neutral-950 font-bold shadow-md' 
+                  : 'text-neutral-300 hover:text-white'
+              }`}
+            >
+              <Info size={13} />
+              <span>{language === 'hi' ? 'विवरण' : 'Info'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. BODY CONTENT (FULL SCREEN VIEW) */}
+      <div className="flex-1 w-full flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        {/* TAB 1: MAIN FULL SCREEN DISC PLAYER */}
+        {activeTab === 'player' && (
+          <div className="w-full max-w-lg flex flex-col items-center text-center space-y-5 sm:space-y-6 animate-in fade-in duration-200">
+            {/* Vinyl Disc Artwork with Rotation Animation */}
+            <div className="relative group my-1">
+              <div className={`w-48 h-48 sm:w-60 sm:h-60 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-orange-400 p-2 shadow-2xl shadow-amber-500/20 flex items-center justify-center ${
+                isPlaying ? 'animate-[spin_12s_linear_infinite]' : ''
+              }`}>
+                <div className="w-full h-full rounded-full bg-neutral-950 border-4 border-neutral-900 flex items-center justify-center relative overflow-hidden shadow-inner">
+                  {/* Vinyl grooves */}
+                  <div className="absolute inset-4 rounded-full border border-neutral-800/80" />
+                  <div className="absolute inset-9 rounded-full border border-neutral-800/60" />
+                  <div className="absolute inset-14 rounded-full border border-neutral-800/40" />
+                  
+                  {/* Center Album Label */}
+                  <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-xl">
+                    <Music size={32} className="text-neutral-950" />
+                  </div>
+                </div>
               </div>
+
+              {/* Pulsing Wave Ring when playing */}
+              {isPlaying && (
+                <div className="absolute -inset-2.5 rounded-full border border-amber-400/30 animate-ping pointer-events-none" />
+              )}
+            </div>
+
+            {/* Audio Wave Frequency Equalizer */}
+            <div className="flex items-end justify-center gap-1.5 h-9 w-60">
+              {[45, 80, 100, 65, 95, 50, 85, 60, 90, 75, 85, 55, 95, 70, 40].map((h, i) => (
+                <div
+                  key={i}
+                  className={`w-1.5 rounded-full transition-all duration-150 ${
+                    isPlaying ? 'bg-amber-400 shadow-sm shadow-amber-400/50' : 'bg-neutral-700'
+                  }`}
+                  style={{
+                    height: isPlaying ? `${Math.max(20, (h * (0.4 + (i % 3) * 0.25)))}%` : '20%',
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Song Details */}
+            <div className="space-y-1 w-full px-4">
+              <h2 className="text-base sm:text-xl font-bold truncate text-white leading-tight" title={file.name}>
+                {file.name}
+              </h2>
+              <p className="text-xs text-neutral-400 truncate">
+                {file.folder} • {formatBytes(file.size)}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: PLAYLIST TRACKS */}
+        {activeTab === 'playlist' && (
+          <div className="w-full max-w-2xl bg-neutral-900/70 backdrop-blur-md rounded-3xl p-4 sm:p-5 border border-white/10 shadow-2xl space-y-3 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10 text-xs text-neutral-400 font-semibold uppercase tracking-wider">
+              <span>{language === 'hi' ? 'प्लेलिस्ट ट्रैक सूची' : 'Playlist Tracks'} ({playlist.length})</span>
+              <span className="text-amber-400">{isShuffle ? '🔀 Shuffle Active' : ''}</span>
+            </div>
+
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
               {playlist.map((track, idx) => {
                 const isSelected = track.id === file.id;
                 return (
@@ -156,29 +271,29 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
                       triggerHapticFeedback();
                       onSelectTrack(track);
                     }}
-                    className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${
+                    className={`flex items-center justify-between p-3.5 rounded-2xl cursor-pointer transition-all ${
                       isSelected 
-                        ? 'bg-amber-500/20 border border-amber-500/30 text-amber-300' 
-                        : 'hover:bg-neutral-800/60 text-neutral-300'
+                        ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300 shadow-md' 
+                        : 'hover:bg-white/5 text-neutral-300 border border-transparent'
                     }`}
                   >
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
                         isSelected ? 'bg-amber-500 text-neutral-950 font-bold' : 'bg-neutral-800 text-neutral-400'
                       }`}>
                         {isSelected && isPlaying ? (
-                          <div className="flex items-end gap-0.5 h-3.5">
+                          <div className="flex items-end gap-0.5 h-4">
                             <span className="w-1 bg-neutral-950 rounded-xs animate-[bounce_0.8s_infinite]" />
                             <span className="w-1 bg-neutral-950 rounded-xs animate-[bounce_0.6s_infinite_0.2s]" />
                             <span className="w-1 bg-neutral-950 rounded-xs animate-[bounce_0.7s_infinite_0.1s]" />
                           </div>
                         ) : (
-                          <span className="text-xs">{idx + 1}</span>
+                          <span className="text-xs font-bold">{idx + 1}</span>
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold truncate">{track.name}</p>
-                        <p className="text-[10px] text-neutral-400 truncate mt-0.5">
+                        <p className="text-sm font-semibold truncate">{track.name}</p>
+                        <p className="text-[11px] text-neutral-400 truncate mt-0.5">
                           {formatBytes(track.size)} • {track.folder}
                         </p>
                       </div>
@@ -187,99 +302,80 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
                 );
               })}
             </div>
-          ) : (
-            /* Main Player Visualizer */
-            <div className="w-full flex flex-col items-center text-center space-y-6">
-              {/* Disc Artwork / Equalizer */}
-              <div className="relative group">
-                <div className={`w-44 h-44 sm:w-52 sm:h-52 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-orange-400 p-1.5 shadow-2xl flex items-center justify-center ${
-                  isPlaying ? 'animate-[spin_12s_linear_infinite]' : ''
-                }`}>
-                  <div className="w-full h-full rounded-full bg-neutral-950 border-4 border-neutral-900 flex items-center justify-center relative overflow-hidden">
-                    {/* Vinyl grooves */}
-                    <div className="absolute inset-4 rounded-full border border-neutral-800/80" />
-                    <div className="absolute inset-8 rounded-full border border-neutral-800/60" />
-                    <div className="absolute inset-12 rounded-full border border-neutral-800/40" />
-                    
-                    {/* Center label */}
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg">
-                      <Music size={28} className="text-neutral-950" />
-                    </div>
-                  </div>
-                </div>
+          </div>
+        )}
 
-                {/* Animated Pulsing Waveform Ring */}
-                {isPlaying && (
-                  <div className="absolute -inset-2 rounded-full border-2 border-amber-400/20 animate-ping pointer-events-none" />
-                )}
+        {/* TAB 3: DETAILS */}
+        {activeTab === 'details' && (
+          <div className="w-full max-w-md bg-neutral-900/70 backdrop-blur-md rounded-3xl p-5 sm:p-6 border border-white/10 shadow-2xl space-y-4 animate-in fade-in duration-200">
+            <h3 className="text-sm font-bold text-neutral-100 border-b border-white/10 pb-3">
+              {language === 'hi' ? 'फ़ाइल व ऑडियो जानकारी' : 'Audio Track Details'}
+            </h3>
+            <div className="space-y-3.5 text-xs text-neutral-300">
+              <div>
+                <span className="text-neutral-500 block text-[11px] font-medium uppercase tracking-wider">{language === 'hi' ? 'नाम' : 'Song Name'}</span>
+                <span className="font-semibold text-white break-words mt-0.5 block text-sm">{file.name}</span>
               </div>
-
-              {/* Animated Frequency Bars */}
-              <div className="flex items-end justify-center gap-1.5 h-8 w-44">
-                {[40, 75, 100, 60, 90, 45, 80, 55, 95, 70, 85, 50].map((h, i) => (
-                  <div
-                    key={i}
-                    className={`w-1 rounded-full transition-all duration-150 ${
-                      isPlaying ? 'bg-amber-400' : 'bg-neutral-700'
-                    }`}
-                    style={{
-                      height: isPlaying ? `${Math.max(15, (h * (0.4 + (i % 3) * 0.2)))}%` : '20%',
-                    }}
-                  />
-                ))}
+              <div>
+                <span className="text-neutral-500 block text-[11px] font-medium uppercase tracking-wider">{language === 'hi' ? 'अवधि' : 'Duration'}</span>
+                <span className="font-mono text-amber-400 font-semibold">{formatTime(duration)}</span>
               </div>
-
-              {/* Song Title & Info */}
-              <div className="space-y-1 w-full px-4">
-                <h3 className="text-base sm:text-lg font-bold truncate text-white" title={file.name}>
-                  {file.name}
-                </h3>
-                <p className="text-xs text-neutral-400 truncate">
-                  {file.folder} • {formatBytes(file.size)}
-                </p>
+              <div>
+                <span className="text-neutral-500 block text-[11px] font-medium uppercase tracking-wider">{language === 'hi' ? 'आकार' : 'Size'}</span>
+                <span>{formatBytes(file.size)}</span>
+              </div>
+              <div>
+                <span className="text-neutral-500 block text-[11px] font-medium uppercase tracking-wider">{language === 'hi' ? 'फ़ोल्डर पथ' : 'Folder Path'}</span>
+                <span className="font-mono text-blue-400 break-all">{file.folder}</span>
+              </div>
+              <div>
+                <span className="text-neutral-500 block text-[11px] font-medium uppercase tracking-wider">{language === 'hi' ? 'प्रारूप' : 'Format'}</span>
+                <span className="uppercase text-neutral-200">{file.mimeType}</span>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
 
-        {/* Player Controls & Scrubber */}
-        <div className="p-6 bg-neutral-900/90 border-t border-neutral-800/80 space-y-4">
-          {/* Progress Bar with Timestamps */}
-          <div className="space-y-1.5">
-            <div className="relative group">
+      {/* 3. BOTTOM CONTROLLER (FULL SCREEN CONTROLS) */}
+      <div className="w-full p-4 sm:p-5 pb-safe bg-black/70 backdrop-blur-lg border-t border-white/5 space-y-3.5 shrink-0">
+        <div className="max-w-xl mx-auto w-full space-y-3.5">
+          {/* Progress Bar & Timestamps */}
+          <div className="space-y-1">
+            <div className="relative group flex items-center">
               <input
                 type="range"
                 min={0}
                 max={duration || 100}
                 value={currentTime || 0}
                 onChange={(e) => onSeek(Number(e.target.value))}
-                className="w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-amber-500 focus:outline-hidden"
+                className="w-full h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-amber-500 focus:outline-hidden"
               />
               <div 
-                className="absolute top-0 left-0 h-1.5 bg-gradient-to-r from-amber-500 to-orange-400 rounded-lg pointer-events-none"
+                className="absolute top-0 left-0 h-2 bg-gradient-to-r from-amber-500 to-orange-400 rounded-lg pointer-events-none"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <div className="flex justify-between text-[11px] text-neutral-400 font-mono">
+            <div className="flex justify-between text-xs text-neutral-400 font-mono">
               <span>{formatTime(currentTime)}</span>
               <span>{formatTime(duration)}</span>
             </div>
           </div>
 
           {/* Core Playback Buttons */}
-          <div className="flex items-center justify-between px-2">
+          <div className="flex items-center justify-between px-1 sm:px-2">
             {/* Shuffle */}
             <button
               onClick={() => {
                 triggerHapticFeedback();
                 onToggleShuffle();
               }}
-              className={`p-2.5 rounded-full transition-colors cursor-pointer ${
-                isShuffle ? 'text-amber-400 bg-amber-500/15' : 'text-neutral-400 hover:text-white'
+              className={`p-2.5 sm:p-3 rounded-full transition-colors cursor-pointer ${
+                isShuffle ? 'text-amber-400 bg-amber-500/20' : 'text-neutral-400 hover:text-white'
               }`}
               title={isShuffle ? 'Shuffle On' : 'Shuffle Off'}
             >
-              <Shuffle size={18} />
+              <Shuffle size={19} />
             </button>
 
             {/* Skip Back 10s */}
@@ -288,10 +384,10 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
                 triggerHapticFeedback();
                 onSeek(Math.max(0, currentTime - 10));
               }}
-              className="p-2.5 text-neutral-400 hover:text-white rounded-full transition-colors cursor-pointer"
+              className="p-2.5 sm:p-3 text-neutral-400 hover:text-white rounded-full transition-colors cursor-pointer"
               title="-10s"
             >
-              <RotateCcw size={20} />
+              <RotateCcw size={21} />
             </button>
 
             {/* Previous Track */}
@@ -300,7 +396,7 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
                 triggerHapticFeedback();
                 onPrev();
               }}
-              className="p-2.5 text-neutral-200 hover:text-white rounded-full transition-colors cursor-pointer"
+              className="p-2.5 sm:p-3 text-neutral-200 hover:text-white rounded-full transition-colors cursor-pointer"
               title="Previous Track"
             >
               <SkipBack size={24} />
@@ -312,7 +408,7 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
                 triggerHapticFeedback();
                 onPlayPause();
               }}
-              className="w-14 h-14 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 active:scale-95 text-neutral-950 font-bold flex items-center justify-center shadow-lg shadow-amber-500/25 transition-all cursor-pointer"
+              className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 active:scale-95 text-neutral-950 font-bold flex items-center justify-center shadow-xl shadow-amber-500/30 transition-all cursor-pointer"
               title={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
@@ -328,7 +424,7 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
                 triggerHapticFeedback();
                 onNext();
               }}
-              className="p-2.5 text-neutral-200 hover:text-white rounded-full transition-colors cursor-pointer"
+              className="p-2.5 sm:p-3 text-neutral-200 hover:text-white rounded-full transition-colors cursor-pointer"
               title="Next Track"
             >
               <SkipForward size={24} />
@@ -340,10 +436,10 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
                 triggerHapticFeedback();
                 onSeek(Math.min(duration, currentTime + 10));
               }}
-              className="p-2.5 text-neutral-400 hover:text-white rounded-full transition-colors cursor-pointer"
+              className="p-2.5 sm:p-3 text-neutral-400 hover:text-white rounded-full transition-colors cursor-pointer"
               title="+10s"
             >
-              <RotateCw size={20} />
+              <RotateCw size={21} />
             </button>
 
             {/* Repeat Mode */}
@@ -352,43 +448,45 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
                 triggerHapticFeedback();
                 onToggleRepeat();
               }}
-              className={`p-2.5 rounded-full transition-colors cursor-pointer ${
-                repeatMode !== 'off' ? 'text-amber-400 bg-amber-500/15' : 'text-neutral-400 hover:text-white'
+              className={`p-2.5 sm:p-3 rounded-full transition-colors cursor-pointer ${
+                repeatMode !== 'off' ? 'text-amber-400 bg-amber-500/20' : 'text-neutral-400 hover:text-white'
               }`}
               title={`Repeat: ${repeatMode}`}
             >
-              {repeatMode === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
+              {repeatMode === 'one' ? <Repeat1 size={19} /> : <Repeat size={19} />}
             </button>
           </div>
 
-          {/* Extra Mobile Actions: Open in Phone Player & Share */}
-          <div className="grid grid-cols-2 gap-2.5 pt-2">
-            {file.url && (
+          {/* Quick Actions (Open in Phone App & Share) */}
+          <div className="grid grid-cols-2 gap-2.5 pt-1">
+            {file.url ? (
               <button
                 onClick={() => {
                   triggerHapticFeedback();
                   openRealFile(file.url!);
                 }}
-                className="py-2.5 px-3 bg-neutral-800 hover:bg-neutral-700 active:scale-98 rounded-xl text-xs font-semibold text-neutral-200 flex items-center justify-center gap-1.5 transition-all border border-neutral-700 cursor-pointer"
+                className="py-2.5 px-3 bg-white/5 hover:bg-white/10 active:scale-98 rounded-2xl text-xs font-bold text-neutral-200 flex items-center justify-center gap-1.5 transition-all border border-white/10 cursor-pointer whitespace-nowrap"
               >
-                <ExternalLink size={14} className="text-amber-400" />
+                <ExternalLink size={14} className="text-amber-400 shrink-0" />
                 <span className="truncate">
-                  {language === 'hi' ? 'फ़ोन प्लेयर में बजाएं' : 'Open in Music App'}
+                  {language === 'hi' ? 'फ़ोन प्लेयर में बजाएं' : 'Open in Phone App'}
                 </span>
               </button>
+            ) : (
+              <div />
             )}
 
             <button
               onClick={() => {
                 triggerHapticFeedback();
                 if (file.url) {
-                  shareNativeFile(file.name, `Sharing ${file.name}`, file.url);
+                  shareNativeFile(file.name, `Music: ${file.name}`, file.url);
                 }
               }}
-              className="py-2.5 px-3 bg-neutral-800 hover:bg-neutral-700 active:scale-98 rounded-xl text-xs font-semibold text-neutral-200 flex items-center justify-center gap-1.5 transition-all border border-neutral-700 cursor-pointer"
+              className="py-2.5 px-3 bg-white/5 hover:bg-white/10 active:scale-98 rounded-2xl text-xs font-bold text-neutral-200 flex items-center justify-center gap-1.5 transition-all border border-white/10 cursor-pointer whitespace-nowrap"
             >
-              <Share2 size={14} className="text-blue-400" />
-              <span className="truncate">{language === 'hi' ? 'शेयर करें' : 'Share Song'}</span>
+              <Share2 size={14} className="text-blue-400 shrink-0" />
+              <span className="truncate">{language === 'hi' ? 'शेयर करें' : 'Share Track'}</span>
             </button>
           </div>
         </div>

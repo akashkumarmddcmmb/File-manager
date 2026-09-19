@@ -489,6 +489,46 @@ export async function scanNativeStorage(): Promise<{
 }
 
 /**
+ * Deep scan for all files in a specific category (audio, videos, images, documents, apps, downloads)
+ * across both Internal Storage and SD Card.
+ */
+export async function scanCategoryFilesFromDevice(category: string): Promise<FileItem[] | null> {
+  const isNative = await isNativePlatform();
+  if (!isNative) return null;
+
+  try {
+    const res = await RealDeviceStorage.scanMediaCategory({ category });
+    if (!res || !res.files) return null;
+
+    return res.files.map(f => {
+      const webUrl = f.path.startsWith('http') || f.path.startsWith('data:') || f.path.startsWith('blob:')
+        ? f.path
+        : (typeof Capacitor !== 'undefined' && Capacitor.convertFileSrc ? Capacitor.convertFileSrc(f.path) : f.path);
+      
+      const classification = classifyFile(f.name, f.mimeType);
+      const resolvedType = f.type && f.type !== 'other' ? f.type : classification.type;
+
+      return {
+        id: f.id,
+        name: f.name,
+        size: f.size,
+        type: resolvedType,
+        mimeType: f.mimeType || classification.mimeType,
+        folder: f.folder,
+        storageDevice: f.storageDevice || (f.path.includes('emulated') ? 'internal' : 'sdcard'),
+        url: f.path,
+        thumbnail: resolvedType === 'image' || resolvedType === 'video' ? webUrl : undefined,
+        createdAt: new Date(f.lastModified || Date.now()).toISOString(),
+        updatedAt: new Date(f.lastModified || Date.now()).toISOString(),
+      };
+    });
+  } catch (e) {
+    console.warn('Category deep scan error:', e);
+    return null;
+  }
+}
+
+/**
  * Dynamically list files and folders inside any real device path (internal or SD card)
  */
 export async function listRealDirectoryFiles(targetPath: string): Promise<{
