@@ -38,7 +38,7 @@ export const Navigation: React.FC<NavigationProps> = ({
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/98 backdrop-blur-md border-t border-[#e1e3e1] py-1.5 px-4 shadow-sm pb-[max(0.375rem,env(safe-area-inset-bottom))]">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/98 dark:bg-[#1f2420]/98 backdrop-blur-md border-t border-[#e1e3e1] dark:border-[#2a322c] py-1.5 px-4 shadow-sm pb-[max(0.375rem,env(safe-area-inset-bottom))] transition-colors">
       <div className="max-w-md mx-auto flex items-center justify-around">
         {navItems.map((item) => {
           const isActive = activeTab === item.id;
@@ -53,13 +53,13 @@ export const Navigation: React.FC<NavigationProps> = ({
               <div
                 className={`relative px-5 py-1 rounded-full transition-all duration-200 flex items-center justify-center ${
                   isActive
-                    ? 'bg-[#c2e7ff] text-[#001d35]'
-                    : 'text-[#444746] group-hover:text-neutral-900 group-hover:bg-neutral-100/70'
+                    ? 'bg-[#cbf2d6] dark:bg-[#2b4433] text-[#0d381e] dark:text-[#cbf2d6]'
+                    : 'text-[#444746] dark:text-[#c4c7c5] group-hover:text-neutral-900 dark:group-hover:text-white group-hover:bg-neutral-100/70 dark:group-hover:bg-neutral-800/70'
                 }`}
               >
                 {item.icon}
                 {item.badge && item.badge > 0 && !isActive ? (
-                  <span className="absolute top-0 right-3 w-2.5 h-2.5 bg-blue-600 rounded-full ring-2 ring-white"></span>
+                  <span className="absolute top-0 right-3 w-2.5 h-2.5 bg-emerald-600 rounded-full ring-2 ring-white dark:ring-[#1f2420]"></span>
                 ) : null}
               </div>
 
@@ -67,8 +67,8 @@ export const Navigation: React.FC<NavigationProps> = ({
               <span
                 className={`text-[12px] tracking-normal transition-colors ${
                   isActive 
-                    ? 'text-[#001d35] font-bold' 
-                    : 'text-[#444746] font-medium group-hover:text-neutral-900'
+                    ? 'text-[#0d381e] dark:text-[#cbf2d6] font-bold' 
+                    : 'text-[#444746] dark:text-[#c4c7c5] font-medium group-hover:text-neutral-900 dark:group-hover:text-white'
                 }`}
               >
                 {item.label}

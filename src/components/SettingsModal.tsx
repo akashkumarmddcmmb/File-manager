@@ -49,6 +49,8 @@ interface SettingsModalProps {
   onClearDemoFiles?: () => void;
   onRestoreDemoFiles?: () => void;
   onOpenFeedback?: () => void;
+  themePreference?: 'system' | 'light' | 'dark';
+  onThemeChange?: (theme: 'system' | 'light' | 'dark') => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -64,6 +66,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClearDemoFiles,
   onRestoreDemoFiles,
   onOpenFeedback,
+  themePreference: propThemePref = 'system',
+  onThemeChange,
 }) => {
   const t = translations[language];
 
@@ -284,6 +288,70 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   }`}
                 >
                   हिन्दी
+                </button>
+              </div>
+            </div>
+
+            <div className="border-t border-neutral-100" />
+
+            {/* Theme Selector (System Auto / Light / Dark) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1 gap-2">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                  <SunMoon size={17} />
+                </div>
+                <div>
+                  <div className="text-xs sm:text-sm font-semibold text-neutral-800">
+                    {t.themeMode || (language === 'hi' ? 'थीम मोड' : 'Theme')}
+                  </div>
+                  <div className="text-[11px] text-neutral-500 leading-tight">
+                    {themePreference === 'system' 
+                      ? (language === 'hi' ? 'फोन की डार्क/लाइट थीम सेटिंग के अनुसार स्वयंचलित' : 'Auto according to system dark/light mode')
+                      : themePreference === 'dark' 
+                      ? (language === 'hi' ? 'डार्क थीम (Dark Mode)' : 'Dark theme')
+                      : (language === 'hi' ? 'लाइट थीम (Light Mode)' : 'Light theme')}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl self-end sm:self-auto shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setThemePreference('system');
+                    localStorage.setItem('akash_files_theme', 'system');
+                    if (onThemeChange) onThemeChange('system');
+                  }}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                    themePreference === 'system' ? 'bg-white text-blue-600 shadow-xs' : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  {t.themeSystem || (language === 'hi' ? 'सिस्टम' : 'System')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setThemePreference('light');
+                    localStorage.setItem('akash_files_theme', 'light');
+                    if (onThemeChange) onThemeChange('light');
+                  }}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                    themePreference === 'light' ? 'bg-white text-amber-600 shadow-xs' : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  {t.themeLight || (language === 'hi' ? 'लाइट' : 'Light')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setThemePreference('dark');
+                    localStorage.setItem('akash_files_theme', 'dark');
+                    if (onThemeChange) onThemeChange('dark');
+                  }}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                    themePreference === 'dark' ? 'bg-white text-purple-700 shadow-xs' : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  {t.themeDark || (language === 'hi' ? 'डार्क' : 'Dark')}
                 </button>
               </div>
             </div>

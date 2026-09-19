@@ -54,16 +54,16 @@ export const Header: React.FC<HeaderProps> = ({
   const t = translations[language];
 
   return (
-    <header className="sticky top-0 z-30 bg-[#f8fafd]/95 backdrop-blur-md px-3 sm:px-6 pt-[max(0.625rem,env(safe-area-inset-top))] pb-2 transition-colors">
+    <header className="sticky top-0 z-30 bg-[#f0f4f1]/95 dark:bg-[#131814]/95 backdrop-blur-md px-3 sm:px-6 pt-[max(0.625rem,env(safe-area-inset-top))] pb-2 transition-colors">
       <div className="max-w-4xl mx-auto">
         {/* Google Files Signature Material 3 Floating Search Bar */}
-        <div className="bg-white rounded-full border border-neutral-200/90 shadow-xs hover:shadow-md transition-shadow px-2.5 sm:px-4 py-1.5 flex items-center gap-2 sm:gap-3">
+        <div className="bg-white dark:bg-[#1f2420] rounded-full border border-neutral-200/90 dark:border-neutral-700/80 shadow-xs hover:shadow-md transition-shadow px-2.5 sm:px-4 py-1.5 flex items-center gap-2 sm:gap-3">
           {/* Hamburger Menu Button */}
           <button
             id="btn-hamburger-menu"
             onClick={onOpenDrawer}
             title="Open navigation menu"
-            className="p-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors cursor-pointer shrink-0"
+            className="p-2 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors cursor-pointer shrink-0"
           >
             <Menu size={22} />
           </button>
@@ -75,20 +75,20 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Search Input Container */}
           <div className="flex-1 flex items-center relative min-w-0">
-            <Search size={18} className="text-neutral-400 shrink-0 mr-2" />
+            <Search size={18} className="text-neutral-400 dark:text-neutral-500 shrink-0 mr-2" />
             <input
               id="files-global-search"
               type="text"
               placeholder={t.searchPlaceholder}
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full bg-transparent text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none border-none py-1"
+              className="w-full bg-transparent text-sm text-neutral-800 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-400 focus:outline-none border-none py-1"
             />
             {searchQuery && (
               <button
                 id="btn-clear-search"
                 onClick={() => onSearchChange('')}
-                className="p-1 rounded-full text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"
+                className="p-1 rounded-full text-neutral-400 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shrink-0"
               >
                 <X size={16} />
               </button>

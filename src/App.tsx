@@ -276,6 +276,57 @@ export default function App() {
   const [currentFolderPath, setCurrentFolderPath] = useState('/');
   const [activeStorageDevice, setActiveStorageDevice] = useState<StorageDevice>('internal');
 
+  // Automatic Theme State ('system' | 'light' | 'dark')
+  const [themePreference, setThemePreference] = useState<'system' | 'light' | 'dark'>(() => {
+    return (localStorage.getItem('akash_files_theme') as 'system' | 'light' | 'dark') || 'system';
+  });
+
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('akash_files_theme') || 'system';
+    if (saved === 'dark') return true;
+    if (saved === 'light') return false;
+    return typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false;
+  });
+
+  // Listen to system theme changes & themePreference updates automatically
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    const applyTheme = (eMatches: boolean) => {
+      let dark = false;
+      if (themePreference === 'dark') {
+        dark = true;
+      } else if (themePreference === 'light') {
+        dark = false;
+      } else {
+        dark = eMatches;
+      }
+      setIsDarkMode(dark);
+      if (dark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+
+    applyTheme(mediaQuery.matches);
+
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (themePreference === 'system') {
+        applyTheme(e.matches);
+      }
+    };
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    } else {
+      mediaQuery.addListener(handleChange);
+      return () => mediaQuery.removeListener(handleChange);
+    }
+  }, [themePreference]);
+
   // 3. Modals State
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
@@ -1453,7 +1504,7 @@ export default function App() {
 
   return (
     <div 
-      className="min-h-screen bg-[#f8fafd] text-neutral-900 flex flex-col font-sans selection:bg-blue-100 selection:text-blue-900 relative"
+      className="min-h-screen bg-[#f0f4f1] dark:bg-[#131814] text-neutral-900 dark:text-neutral-100 flex flex-col font-sans selection:bg-emerald-100 selection:text-emerald-900 relative transition-colors duration-200"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -2068,6 +2119,8 @@ export default function App() {
         onClearDemoFiles={handleClearDemoFiles}
         onRestoreDemoFiles={handleRestoreDemoFiles}
         onOpenFeedback={() => setIsFeedbackOpen(true)}
+        themePreference={themePreference}
+        onThemeChange={(newTheme) => setThemePreference(newTheme)}
       />
 
       {/* Developer Feedback & Ticket Log Sheet Modal */}

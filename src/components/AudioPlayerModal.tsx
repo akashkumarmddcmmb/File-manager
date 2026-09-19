@@ -127,28 +127,30 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 w-full h-full bg-[#101216] text-white flex flex-col justify-between select-none overflow-hidden animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 w-full h-full bg-[#344234] text-white flex flex-col justify-between select-none overflow-hidden animate-in fade-in duration-200"
       onClick={(e) => e.stopPropagation()}
     >
       {/* 1. TOP BAR (Matching Google Files 1:1) */}
-      <div className="w-full px-3 py-2.5 pt-safe bg-[#101216] border-b border-white/5 shrink-0 flex items-center justify-between z-20">
+      <div className="w-full px-3 py-3 pt-safe bg-[#344234] shrink-0 flex items-center justify-between z-20">
         {/* Left: Back Arrow */}
         <button
           onClick={() => {
             triggerHapticFeedback();
             onMinimize();
           }}
-          className="p-2 text-neutral-200 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer shrink-0"
+          className="p-2 text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer shrink-0"
           title={language === 'hi' ? 'पीछे जाएँ' : 'Back'}
         >
           <ArrowLeft size={24} />
         </button>
 
-        {/* Center Title */}
+        {/* Center Title (Clean) */}
         <div className="flex-1 text-center min-w-0 px-2">
-          <span className="text-xs font-semibold text-neutral-300 block truncate">
-            {language === 'hi' ? 'ऑडियो प्लेयर' : 'Audio Player'}
-          </span>
+          {activeTab !== 'player' && (
+            <span className="text-xs font-semibold text-neutral-200 block truncate">
+              {activeTab === 'playlist' ? (language === 'hi' ? 'प्लेलिस्ट' : 'Playlist') : (language === 'hi' ? 'विवरण' : 'Details')}
+            </span>
+          )}
         </div>
 
         {/* Right Action Icons: Share, Star, Three-Dots Menu */}
@@ -161,10 +163,10 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
                 shareNativeFile(file.name, `Audio: ${file.name}`, file.url);
               }
             }}
-            className="p-2 text-neutral-300 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+            className="p-2 text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
             title={language === 'hi' ? 'शेयर करें' : 'Share'}
           >
-            <Share2 size={20} />
+            <Share2 size={22} />
           </button>
 
           {/* Star / Favorite */}
@@ -174,11 +176,11 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
               if (onToggleStar) onToggleStar(file.id);
             }}
             className={`p-2 rounded-full transition-colors cursor-pointer ${
-              isStarred ? 'text-amber-400 bg-amber-400/10' : 'text-neutral-300 hover:text-white hover:bg-white/10'
+              isStarred ? 'text-amber-300' : 'text-white hover:bg-white/10'
             }`}
             title={isStarred ? 'Starred' : 'Star file'}
           >
-            <Star size={20} className={isStarred ? 'fill-amber-400' : ''} />
+            <Star size={22} className={isStarred ? 'fill-amber-300 text-amber-300' : ''} />
           </button>
 
           {/* Three Dots Menu */}
@@ -187,10 +189,10 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
               triggerHapticFeedback();
               setIsMenuOpen(!isMenuOpen);
             }}
-            className="p-2 text-neutral-300 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+            className="p-2 text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
             title={language === 'hi' ? 'अधिक विकल्प' : 'More options'}
           >
-            <MoreVertical size={20} />
+            <MoreVertical size={22} />
           </button>
 
           {/* GOOGLE FILES OPTIONS POPUP MENU */}
@@ -314,8 +316,8 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
       </div>
 
       {/* SEGMENTED TAB SELECTOR (Player / Playlist / Details) */}
-      <div className="w-full px-4 py-2 bg-[#121419] border-b border-white/5 flex items-center justify-center shrink-0">
-        <div className="inline-flex items-center bg-white/5 p-1 rounded-2xl border border-white/10">
+      <div className="w-full px-4 py-1.5 bg-[#344234] flex items-center justify-center shrink-0">
+        <div className="inline-flex items-center bg-black/20 p-1 rounded-2xl border border-white/10">
           <button
             onClick={() => {
               triggerHapticFeedback();
@@ -323,8 +325,8 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
             }}
             className={`px-4 py-1 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'player' 
-                ? 'bg-amber-500 text-neutral-950 font-bold shadow-md' 
-                : 'text-neutral-400 hover:text-white'
+                ? 'bg-white text-neutral-950 font-bold shadow-md' 
+                : 'text-neutral-200 hover:text-white'
             }`}
           >
             <Music size={13} />
@@ -338,8 +340,8 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
             }}
             className={`px-4 py-1 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'playlist' 
-                ? 'bg-amber-500 text-neutral-950 font-bold shadow-md' 
-                : 'text-neutral-400 hover:text-white'
+                ? 'bg-white text-neutral-950 font-bold shadow-md' 
+                : 'text-neutral-200 hover:text-white'
             }`}
           >
             <ListMusic size={13} />
@@ -354,8 +356,8 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
             }}
             className={`px-4 py-1 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'details' 
-                ? 'bg-amber-500 text-neutral-950 font-bold shadow-md' 
-                : 'text-neutral-400 hover:text-white'
+                ? 'bg-white text-neutral-950 font-bold shadow-md' 
+                : 'text-neutral-200 hover:text-white'
             }`}
           >
             <Info size={13} />
@@ -501,7 +503,7 @@ export const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
       </div>
 
       {/* 3. BOTTOM CONTROLLER (Progress Bar + Play/Pause Controls) */}
-      <div className="w-full p-4 pb-safe bg-[#0d0f13] border-t border-white/10 space-y-3 shrink-0">
+      <div className="w-full p-4 pb-safe bg-[#283427] border-t border-white/10 space-y-3 shrink-0">
         <div className="max-w-md mx-auto w-full space-y-3">
           {/* Progress Timeline Scrubber */}
           <div className="space-y-1">

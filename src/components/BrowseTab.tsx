@@ -249,13 +249,13 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
         </section>
       )}
 
-      {/* 2. Categories Grid (Material 3 Two-column / Three-column layout) */}
+      {/* 2. Categories Grid (Material 3 Two-column grid matching Google Files 1:1) */}
       <section className="space-y-2.5">
         <h2 className="text-sm font-semibold text-neutral-800 tracking-tight px-1">
           {t.categories}
         </h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
           {categories.map((cat) => (
             <button
               key={cat.id}
@@ -264,33 +264,19 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
                 triggerHapticFeedback();
                 onSelectCategory(cat.id);
               }}
-              className="w-full bg-white p-3.5 rounded-2xl border border-neutral-200/90 hover:border-neutral-300 hover:shadow-xs transition-all flex items-center justify-between text-left group cursor-pointer active:scale-[0.98] transition-transform"
+              className="w-full bg-white/90 p-3 sm:p-3.5 rounded-2xl border border-neutral-200/80 hover:border-neutral-300 hover:shadow-xs transition-all flex items-center gap-3 text-left group cursor-pointer active:scale-[0.98]"
             >
-              <div className="flex items-center gap-3.5 min-w-0">
-                <div className={`w-11 h-11 rounded-full ${cat.iconBg} flex items-center justify-center shrink-0`}>
-                  {cat.icon}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-sm font-semibold text-neutral-900 truncate">
-                    {cat.name}
-                  </h3>
-                  <p className="text-[11px] text-neutral-500 truncate mt-0.5">
-                    {cat.count} {t.items} • {formatBytes(cat.size)}
-                  </p>
-                  <div className="flex items-center gap-1.5 mt-1 text-[10px]">
-                    {cat.sdCount > 0 ? (
-                      <span className="px-1.5 py-0.2 rounded font-semibold bg-purple-50 text-purple-700 border border-purple-100">
-                        📱 {cat.internalCount} Int + 💾 {cat.sdCount} SD
-                      </span>
-                    ) : (
-                      <span className="text-neutral-400">
-                        📱 {cat.internalCount} Internal
-                      </span>
-                    )}
-                  </div>
-                </div>
+              <div className={`w-10 h-10 rounded-xl ${cat.iconBg} flex items-center justify-center shrink-0`}>
+                {cat.icon}
               </div>
-              <ChevronRight size={18} className="text-neutral-400 group-hover:text-neutral-800 group-hover:translate-x-0.5 transition-all shrink-0" />
+              <div className="min-w-0 flex-1">
+                <h3 className="text-xs sm:text-sm font-semibold text-neutral-900 truncate">
+                  {cat.name}
+                </h3>
+                <p className="text-[11px] text-neutral-500 font-medium truncate mt-0.5">
+                  {formatBytes(cat.size)}
+                </p>
+              </div>
             </button>
           ))}
         </div>
@@ -302,71 +288,62 @@ export const BrowseTab: React.FC<BrowseTabProps> = ({
           {t.collections}
         </h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
           {/* Starred */}
           <button
             id="collection-starred"
             onClick={() => onSelectCategory('starred')}
-            className="bg-white p-3.5 rounded-2xl border border-neutral-200/90 hover:border-amber-300 hover:shadow-xs transition-all flex items-center justify-between text-left group cursor-pointer"
+            className="bg-white/90 p-3 sm:p-3.5 rounded-2xl border border-neutral-200/80 hover:border-amber-300 hover:shadow-xs transition-all flex items-center gap-3 text-left group cursor-pointer"
           >
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-11 h-11 rounded-full bg-[#fef7e0] flex items-center justify-center shrink-0">
-                <Star size={22} className="text-[#f29900] fill-[#f29900]" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-neutral-900 truncate">
-                  {t.starred}
-                </h3>
-                <p className="text-[11px] text-neutral-500 mt-0.5">
-                  {starredFiles.length} {t.items}
-                </p>
-              </div>
+            <div className="w-10 h-10 rounded-xl bg-[#fef7e0] flex items-center justify-center shrink-0">
+              <Star size={20} className="text-[#f29900] fill-[#f29900]" />
             </div>
-            <ChevronRight size={18} className="text-neutral-400 group-hover:text-neutral-800 transition-colors shrink-0" />
+            <div className="min-w-0 flex-1">
+              <h3 className="text-xs sm:text-sm font-semibold text-neutral-900 truncate">
+                {t.starred}
+              </h3>
+              <p className="text-[11px] text-neutral-500 font-medium truncate mt-0.5">
+                {starredFiles.length} {t.items}
+              </p>
+            </div>
           </button>
 
           {/* Safe Folder */}
           <button
             id="collection-safe-folder"
             onClick={onOpenSafeFolder}
-            className="bg-white p-3.5 rounded-2xl border border-neutral-200/90 hover:border-blue-300 hover:shadow-xs transition-all flex items-center justify-between text-left group cursor-pointer"
+            className="bg-white/90 p-3 sm:p-3.5 rounded-2xl border border-neutral-200/80 hover:border-emerald-300 hover:shadow-xs transition-all flex items-center gap-3 text-left group cursor-pointer"
           >
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-11 h-11 rounded-full bg-[#e8f0fe] flex items-center justify-center shrink-0">
-                <ShieldCheck size={22} className="text-[#1a73e8]" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-neutral-900 truncate">
-                  {t.safeFolder}
-                </h3>
-                <p className="text-[11px] text-neutral-500 mt-0.5">
-                  {safeFiles.length > 0 ? `${safeFiles.length} locked files` : 'Protected with PIN'}
-                </p>
-              </div>
+            <div className="w-10 h-10 rounded-xl bg-[#e6f4ea] flex items-center justify-center shrink-0">
+              <ShieldCheck size={20} className="text-[#137333]" />
             </div>
-            <ChevronRight size={18} className="text-neutral-400 group-hover:text-neutral-800 transition-colors shrink-0" />
+            <div className="min-w-0 flex-1">
+              <h3 className="text-xs sm:text-sm font-semibold text-neutral-900 truncate">
+                {t.safeFolder}
+              </h3>
+              <p className="text-[11px] text-neutral-500 font-medium truncate mt-0.5">
+                {safeFiles.length > 0 ? `${safeFiles.length} locked` : 'Protected PIN'}
+              </p>
+            </div>
           </button>
 
           {/* Trash */}
           <button
             id="collection-trash"
             onClick={onOpenTrash}
-            className="bg-white p-3.5 rounded-2xl border border-neutral-200/90 hover:border-neutral-400 hover:shadow-xs transition-all flex items-center justify-between text-left group cursor-pointer"
+            className="col-span-2 sm:col-span-1 bg-white/90 p-3 sm:p-3.5 rounded-2xl border border-neutral-200/80 hover:border-neutral-400 hover:shadow-xs transition-all flex items-center gap-3 text-left group cursor-pointer"
           >
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-11 h-11 rounded-full bg-[#f1f3f4] flex items-center justify-center shrink-0">
-                <Trash2 size={22} className="text-[#5f6368]" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-neutral-900 truncate">
-                  {t.trash}
-                </h3>
-                <p className="text-[11px] text-neutral-500 mt-0.5">
-                  {trashFiles.length} {t.items} ({formatBytes(trashFiles.reduce((a, b) => a + b.size, 0))})
-                </p>
-              </div>
+            <div className="w-10 h-10 rounded-xl bg-[#f1f3f4] flex items-center justify-center shrink-0">
+              <Trash2 size={20} className="text-[#5f6368]" />
             </div>
-            <ChevronRight size={18} className="text-neutral-400 group-hover:text-neutral-800 transition-colors shrink-0" />
+            <div className="min-w-0 flex-1">
+              <h3 className="text-xs sm:text-sm font-semibold text-neutral-900 truncate">
+                {t.trash}
+              </h3>
+              <p className="text-[11px] text-neutral-500 font-medium truncate mt-0.5">
+                {trashFiles.length} {t.items}
+              </p>
+            </div>
           </button>
         </div>
       </section>
